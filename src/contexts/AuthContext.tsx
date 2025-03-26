@@ -18,7 +18,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error: null,
   });
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Check for existing session
     const checkAuth = () => {
       const storedUser = localStorage.getItem('user');
