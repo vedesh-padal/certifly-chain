@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ResponseState } from '@/types';
 
