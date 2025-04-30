@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { ThemeToggle } from '@/components/ui-custom/ThemeToggle';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -48,7 +49,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
+    <header className="fixed top-0 left-0 right-0 z-40 bg-background/80 dark:bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
@@ -76,6 +77,9 @@ export const Navbar: React.FC = () => {
           </nav>
 
           <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <ThemeToggle variant="ghost" />
+
             {user && (
               <>
                 <div className="hidden md:flex items-center gap-2">
@@ -119,10 +123,13 @@ export const Navbar: React.FC = () => {
                           <Shield className="h-6 w-6 text-primary" />
                           <span className="font-semibold text-lg">CertiChain</span>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => setIsSheetOpen(false)}>
-                          <X className="h-5 w-5" />
-                          <span className="sr-only">Close</span>
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <ThemeToggle />
+                          <Button variant="ghost" size="icon" onClick={() => setIsSheetOpen(false)}>
+                            <X className="h-5 w-5" />
+                            <span className="sr-only">Close</span>
+                          </Button>
+                        </div>
                       </div>
                       <nav className="flex flex-col gap-1 mt-4">
                         {navigationItems.map((item) => (

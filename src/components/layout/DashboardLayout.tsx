@@ -18,7 +18,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   if (isLoading) {
     // Show loading state
     return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-screen w-full items-center justify-center bg-background dark:bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
           <p className="text-sm text-muted-foreground">Loading...</p>
@@ -37,7 +37,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background dark:bg-background">
       <Navbar />
       <main className="flex-1 pt-16">
         <div className="container mx-auto p-4 md:p-6 space-y-6 animate-fade-in">
