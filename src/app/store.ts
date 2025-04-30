@@ -1,11 +1,15 @@
 import { configureStore } from '@reduxjs/toolkit';
 import issuanceReducer from '../features/issuance/issuanceSlice';
 import authReducer from '../features/auth/authSlice';
+import userSettingsReducer from '../features/user/userSlice';
+import verificationReducer from '../features/verification/verificationSlice';
 
 export const store = configureStore({
 	reducer: {
 		issuance: issuanceReducer,
 		auth: authReducer,
+		userSettings: userSettingsReducer,
+		verification: verificationReducer,
 	},
 	devTools: process.env.NODE_ENV !== 'production',
 });
