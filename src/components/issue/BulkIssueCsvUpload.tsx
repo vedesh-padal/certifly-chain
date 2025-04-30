@@ -6,18 +6,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload } from 'lucide-react';
+import { FileInfo } from '@/types';
 
 interface BulkIssueCsvUploadProps {
-	csvFile: File | null;
+	csvFileInfo: FileInfo | null; // <-- Change prop name and type
 	googleDriveLink: string;
 	isPreviewLoading: boolean;
-	onCsvFileSelect: (file: File) => void;
+	onCsvFileSelect: (file: File | null) => void;
 	onGoogleDriveLinkChange: (value: string) => void;
-	onPreviewCsv: () => Promise<void>; // Make it async if needed
+	onPreviewCsv: () => Promise<void>;
 }
 
 export const BulkIssueCsvUpload: React.FC<BulkIssueCsvUploadProps> = ({
-	csvFile,
+	csvFileInfo,
 	googleDriveLink,
 	isPreviewLoading,
 	onCsvFileSelect,
@@ -43,7 +44,7 @@ export const BulkIssueCsvUpload: React.FC<BulkIssueCsvUploadProps> = ({
 				/>
 
 				{/* Show Drive link input only after CSV is selected */}
-				{csvFile && (
+				{csvFileInfo && (
 					<div className="space-y-4">
 						<div className="space-y-2">
 							<Label htmlFor="drive-folder-link">Google Drive Folder Link (Optional)</Label>
@@ -62,7 +63,7 @@ export const BulkIssueCsvUpload: React.FC<BulkIssueCsvUploadProps> = ({
 						<Button
 							onClick={onPreviewCsv}
 							className="w-full"
-							disabled={!csvFile || isPreviewLoading} // Disable if no file or already loading
+							disabled={!csvFileInfo || isPreviewLoading} // Disable if no file or already loading
 						>
 							{isPreviewLoading ? (
 								<>

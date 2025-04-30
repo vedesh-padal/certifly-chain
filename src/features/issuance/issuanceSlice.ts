@@ -66,9 +66,10 @@ export const previewCsvFile = createAsyncThunk(
 				'Recipient Email': `bulk${i + 1}@test.com`,
 				'Certificate Name/Type': i % 2 === 0 ? 'Bulk Cert Alpha' : 'Bulk Cert Beta',
 				'Issue Date': `2025-0${i % 9 + 1}-1${i % 3 + 0}`,
-				'Certificate Link': i === 3 ? 'INVALID_LINK' : i % 3 === 0 ? `R${1000 + i}.pdf` : `https://drive.google.com/file/d/FAKE_ID_${i}/view`,
+				// 'Certificate Link': i === 3 ? 'INVALID_LINK' : i % 3 === 0 ? `R${1000 + i}.pdf` : `https://drive.google.com/file/d/FAKE_ID_${i}/view`,
+				'Certificate Link': `https://drive.google.com/file/d/FAKE_ID_1/view`,
 				Grade: ['A', 'B+', 'A-', 'C', 'B'][i % 5],
-				_validationError: i === 3 ? "Invalid Certificate Link format." : undefined,
+				// _validationError: i === 3 ? "Invalid Certificate Link format." : undefined,
 			}));
 			const hasErrors = mockData.some(row => row._validationError);
 			console.log('Thunk: previewCsvFile mock success');

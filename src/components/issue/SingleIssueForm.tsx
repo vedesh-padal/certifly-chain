@@ -7,17 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send, AlertCircle } from 'lucide-react'; // Added AlertCircle
-import { ResponseState } from '@/types';
+import { FileInfo, ResponseState } from '@/types';
 import { HowItWorksCard } from './HowItWorksCard'; // Import the HowItWorksCard
 
 interface SingleIssueFormProps {
-	file: File | null;
+	fileInfo: FileInfo | null;
 	recipientEmail: string;
 	recipientName: string;
 	certificateName: string;
 	response: ResponseState;
 	isFormComplete: boolean;
-	onFileSelect: (file: File) => void;
+	onFileSelect: (file: File | null) => void;
 	onRecipientEmailChange: (value: string) => void;
 	onRecipientNameChange: (value: string) => void;
 	onCertificateNameChange: (value: string) => void;
@@ -25,7 +25,7 @@ interface SingleIssueFormProps {
 }
 
 export const SingleIssueForm: React.FC<SingleIssueFormProps> = ({
-	file,
+	fileInfo,
 	recipientEmail,
 	recipientName,
 	certificateName,
