@@ -120,23 +120,42 @@ export interface BatchProgress {
 	failed: number;     // Jobs that permanently failed
 }
 
+export interface FileInfo {
+	name: string;
+	type: string;
+	size: number;
+}
+
 // State slice for the issuance page (relevant parts for bulk)
+
+// --- Updated IssuanceState ---
 export interface IssuanceState {
-	// ... state for single issuance ...
-	csvFile: File | null;
+	// Single Issuance State
+	singleFile: FileInfo | null; // Use FileInfo type
+	singleFileName: string | null; // Keep for convenience? Or remove if FileInfo is enough
+	singleFileType: string | null; // Keep for convenience?
+	singleFormData: {
+		recipientEmail: string;
+		recipientName: string;
+		certificateName: string;
+	};
+	singleResponseState: ResponseState; // Use existing ResponseState type
+	singleLastTaskId: string | null;
+
+	// Bulk Issuance State
+	csvFile: FileInfo | null; // Use FileInfo type
+	csvFileName: string | null; // Keep for convenience?
 	googleDriveLink: string;
 	isPreviewLoading: boolean;
-	previewData: CsvRowData[]; // Data shown in the table before starting
-	previewError: string | null; // Error during preview API call
-	hasPreviewRowErrors: boolean; // Flag if any row has _validationError
+	previewData: CsvRowData[];
+	previewError: string | null;
+	hasPreviewRowErrors: boolean;
 
 	isBatchStarting: boolean; // Loading state for the start API call
-	startBatchError: string | null; // Error during start API call
+	isBatchStarted: boolean; // <-- ADDED: Tracks if batch is active
+	startBatchError: string | null;
 	currentBatchId: string | null;
 
-	// Store the tracked tasks, mapping taskId to its full state
 	trackedTasks: { [taskId: string]: TrackedIssuanceTask };
-
-	// Overall batch progress summary
 	batchProgress: BatchProgress;
 }
