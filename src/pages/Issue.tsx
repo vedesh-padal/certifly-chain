@@ -1,849 +1,543 @@
-import React, { useState, useEffect } from 'react';
+// src/pages/Issue.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { UploadArea } from '@/components/ui-custom/UploadArea';
-import { ResponseBox } from '@/components/ui-custom/ResponseBox';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import { FileUp, Sheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Send, FileUp, Sheet, Play, AlertCircle } from 'lucide-react';
-import { ResponseState } from '@/types';
 
-// Interface for a single certificate issuance task
-interface IssuanceTask {
-  taskId?: string;
-  status: 'pending' | 'processing' | 'success' | 'failed' | 'waiting_wallet';
-  message?: string;
-  hash?: string;
-  txHash?: string;
-  error?: string;
-}
+// Import the new sub-components
+import { SingleIssueForm } from '@/components/issue/SingleIssueForm';
+import { BulkIssueCsvUpload } from '@/components/issue/BulkIssueCsvUpload';
+import { BulkIssuePreviewTable } from '@/components/issue/BulkIssuePreviewTable';
+import { BatchProgressCard } from '@/components/issue/BatchProgressCard';
+import { HowItWorksCard } from '@/components/issue/HowItWorksCard';
+import { BulkGuideCard } from '@/components/issue/BulkGuideCard';
 
-// Interface for CSV row data
-interface CsvRowData {
-  rowNumber: number;
-  rollNo: string;
-  recipientName: string;
-  recipientEmail: string;
-  certificateName: string;
-  certificateLink: string;
-  task?: IssuanceTask;
-}
+// Import types (assuming they are now centralized)
+import { ResponseState, CsvRowData, TrackedIssuanceTask, IssuanceStatusUpdatePayload, BatchProgress, IssuanceJobStatus } from '@/types';
+import { ResponseBox } from '@/components/ui-custom/ResponseBox';
+
+// Mock WebSocket listener setup (replace with actual implementation later)
+const useMockWebSocket = (
+	isBatchStarted: boolean,
+	batchId: string | null,
+	initialPreviewData: CsvRowData[], // Use CsvRowData for initial state
+	setTasks: React.Dispatch<React.SetStateAction<{ [taskId: string]: TrackedIssuanceTask }>>,
+	setBatchProgress: React.Dispatch<React.SetStateAction<BatchProgress>>
+) => {
+	useEffect(() => {
+		if (!isBatchStarted || !batchId || initialPreviewData.length === 0) {
+			return; // Don't simulate if batch not started or no data
+		}
+
+		console.log("Setting up MOCK WebSocket listeners for batch:", batchId);
+		const timeouts: NodeJS.Timeout[] = [];
+
+		// Simulate receiving updates for each task
+		initialPreviewData.forEach((row, index) => {
+			// Generate the taskId the same way the backend does for correlation
+			const taskId = `task_${batchId}_${row['Roll No']}`;
+
+			// Simulate processing delay + random outcome
+			const delay = (index + 1) * 1500 + Math.random() * 1000; // Staggered delay
+			timeouts.push(setTimeout(() => {
+				const isSuccess = Math.random() > 0.2; // 80% success rate
+
+				const updatePayload: IssuanceStatusUpdatePayload = {
+					taskId: taskId,
+					batchId: batchId,
+					status: isSuccess ? 'success' : 'failed',
+					message: isSuccess ? 'Certificate issued successfully' : 'Failed: Mock transaction error',
+					rowData: { // Include minimal rowData as backend does
+						'Roll No': row['Roll No'],
+						'Recipient Name': row['Recipient Name']
+					},
+					timestamp: new Date().toISOString(),
+					txHash: isSuccess ? `0x${Math.random().toString(16).substring(2, 12)}` : undefined,
+					hash: isSuccess ? `0x${Math.random().toString(16).substring(2, 66)}` : undefined,
+					error: isSuccess ? undefined : 'Mock transaction rejected',
+					walletAddress: isSuccess ? `0xWallet${index % 2}` : undefined,
+				};
+
+				console.log("Simulating WS message:", updatePayload);
+
+				// Update the specific task state
+				setTasks(prevTasks => {
+					// Find the existing task data (which was created from CsvRowData)
+					const existingTask = Object.values(prevTasks).find(t => t['Roll No'] === row['Roll No'] && t.batchId === batchId);
+					if (!existingTask) return prevTasks; // Should not happen if initialized correctly
+
+					return {
+						...prevTasks,
+						[taskId]: { // Use taskId as the key
+							...existingTask, // Keep original row data
+							taskId: updatePayload.taskId, // Ensure taskId is set
+							status: updatePayload.status,
+							message: updatePayload.message,
+							hash: updatePayload.hash,
+							txHash: updatePayload.txHash,
+							error: updatePayload.error,
+							walletAddress: updatePayload.walletAddress,
+							lastUpdated: updatePayload.timestamp,
+						}
+					};
+				});
+
+				// Update overall batch progress
+				setBatchProgress(prev => ({
+					...prev,
+					processed: prev.processed + 1, // Increment processed count
+					success: prev.success + (isSuccess ? 1 : 0),
+					failed: prev.failed + (isSuccess ? 0 : 1),
+				}));
+
+			}, delay));
+		});
+
+		// Cleanup timeouts on unmount or when batch changes
+		return () => {
+			console.log("Cleaning up MOCK WebSocket listeners for batch:", batchId);
+			timeouts.forEach(clearTimeout);
+		};
+
+	}, [isBatchStarted, batchId, initialPreviewData, setTasks, setBatchProgress]); // Rerun simulation if batch changes
+};
+
 
 const Issue: React.FC = () => {
-  const { toast } = useToast();
-  
-  // State for single certificate issuance
-  const [activeTab, setActiveTab] = useState<string>("single");
-  const [file, setFile] = useState<File | null>(null);
-  const [recipientEmail, setRecipientEmail] = useState('');
-  const [recipientName, setRecipientName] = useState('');
-  const [certificateName, setCertificateName] = useState('');
-  const [response, setResponse] = useState<ResponseState>({
-    isLoading: false,
-    isSuccess: false,
-    isError: false,
-    message: '',
-  });
+	const { toast } = useToast();
 
-  // State for bulk certificate issuance
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [googleDriveLink, setGoogleDriveLink] = useState('');
-  const [csvPreviewData, setCsvPreviewData] = useState<CsvRowData[]>([]);
-  const [showPreview, setShowPreview] = useState(false);
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
-  const [isBatchStarted, setIsBatchStarted] = useState(false);
-  const [batchResponse, setBatchResponse] = useState<ResponseState>({
-    isLoading: false,
-    isSuccess: false,
-    isError: false,
-    message: '',
-  });
-  const [batchId, setBatchId] = useState<string | null>(null);
-  const [batchProgress, setBatchProgress] = useState({
-    total: 0,
-    completed: 0,
-    success: 0,
-    failed: 0,
-  });
+	// === State Management ===
+	// Shared state
+	const [activeTab, setActiveTab] = useState<string>("single");
 
-  // Select file for single certificate issuance
-  const handleFileSelect = (selectedFile: File) => {
-    setFile(selectedFile);
-    
-    // Mock file name extraction
-    if (selectedFile.name.includes('certificate')) {
-      setCertificateName('Certificate of Achievement');
-    } else if (selectedFile.name.includes('degree')) {
-      setCertificateName('Bachelor of Science');
-    } else if (selectedFile.name.includes('diploma')) {
-      setCertificateName('Diploma in Computer Science');
-    }
-  };
+	// Single Issuance State
+	const [singleFile, setSingleFile] = useState<File | null>(null);
+	const [singleRecipientEmail, setSingleRecipientEmail] = useState('');
+	const [singleRecipientName, setSingleRecipientName] = useState('');
+	const [singleCertificateName, setSingleCertificateName] = useState('');
+	const [singleResponse, setSingleResponse] = useState<ResponseState>({ isLoading: false, isSuccess: false, isError: false, message: '' });
 
-  // Select CSV file for bulk issuance
-  const handleCsvFileSelect = (selectedFile: File) => {
-    setCsvFile(selectedFile);
-    setShowPreview(false); // Reset preview when a new file is selected
-    setCsvPreviewData([]);
-  };
+	// Bulk Issuance State
+	const [bulkCsvFile, setBulkCsvFile] = useState<File | null>(null);
+	const [bulkDriveLink, setBulkDriveLink] = useState('');
+	const [bulkPreviewData, setBulkPreviewData] = useState<CsvRowData[]>([]); // Holds raw preview data
+	const [bulkHasPreviewRowErrors, setBulkHasPreviewRowErrors] = useState<boolean>(false);
+	const [bulkShowPreview, setBulkShowPreview] = useState(false);
+	const [bulkIsPreviewLoading, setBulkIsPreviewLoading] = useState(false);
+	const [bulkIsBatchStarting, setBulkIsBatchStarting] = useState(false); // Loading for the start API call
+	const [bulkIsBatchStarted, setBulkIsBatchStarted] = useState(false); // Tracks if batch processing is active
+	const [bulkBatchId, setBulkBatchId] = useState<string | null>(null);
+	const [bulkBatchResponse, setBulkBatchResponse] = useState<ResponseState>({ isLoading: false, isSuccess: false, isError: false, message: '' }); // For the start API call result
+	const [bulkTrackedTasks, setBulkTrackedTasks] = useState<{ [taskId: string]: TrackedIssuanceTask }>({}); // Holds the state of each task for UI updates
+	const [bulkBatchProgress, setBulkBatchProgress] = useState<BatchProgress>({ total: 0, processed: 0, success: 0, failed: 0 });
 
-  // Placeholder function to handle previewing CSV data
-  const handlePreviewCsv = async () => {
-    if (!csvFile) {
-      toast({
-        title: 'Error',
-        description: 'Please upload a CSV file first',
-        variant: 'destructive',
-      });
-      return;
-    }
+	// --- Derived State ---
+	const isSingleFormComplete: boolean = Boolean(singleFile) && Boolean(singleRecipientEmail) && Boolean(singleRecipientName) && Boolean(singleCertificateName);
 
-    setIsPreviewLoading(true);
-    
-    try {
-      // Simulate API call to parse CSV
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock CSV data for preview
-      const mockData: CsvRowData[] = Array.from({ length: 15 }, (_, i) => ({
-        rowNumber: i + 1,
-        rollNo: `R00${i + 1}`,
-        recipientName: `Student ${i + 1}`,
-        recipientEmail: `student${i + 1}@example.com`,
-        certificateName: i % 3 === 0 ? 'Bachelor of Science' : i % 3 === 1 ? 'Master of Arts' : 'Certificate of Completion',
-        certificateLink: i % 4 === 0 ? 'Invalid link format' : `certificate_${i + 1}.pdf`,
-        task: {
-          status: 'pending',
-          message: 'Waiting to start'
-        }
-      }));
-      
-      setCsvPreviewData(mockData);
-      setShowPreview(true);
-      
-      // Show toast for successful preview
-      toast({
-        title: 'CSV Preview Ready',
-        description: `${mockData.length} entries loaded for preview`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to parse CSV file',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  };
+	// --- Handlers for Single Issuance ---
+	const handleSingleFileSelect = useCallback((selectedFile: File) => {
+		setSingleFile(selectedFile);
+		// Mock name extraction (keep or remove as needed)
+		if (selectedFile.name.includes('degree')) setSingleCertificateName('Bachelor of Science');
+		else if (selectedFile.name.includes('diploma')) setSingleCertificateName('Diploma');
+		else setSingleCertificateName('Certificate');
+	}, []);
 
-  // Placeholder function to handle single certificate issuance
-  const handleSingleIssuance = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!file) {
-      toast({
-        title: 'Error',
-        description: 'Please upload a certificate file',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    if (!recipientEmail || !recipientName || !certificateName) {
-      toast({
-        title: 'Error',
-        description: 'Please fill in all the required fields',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    // Set loading state
-    setResponse({
-      isLoading: true,
-      isSuccess: false,
-      isError: false,
-      message: 'Issuing certificate on the blockchain...',
-    });
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate success
-      setResponse({
-        isLoading: false,
-        isSuccess: true,
-        isError: false,
-        message: 'Certificate has been successfully queued for issuance with Task ID: TID-123456. You will be notified once the certificate is recorded on the blockchain.',
-      });
-      
-      // Reset form after success
-      setTimeout(() => {
-        setFile(null);
-        setRecipientEmail('');
-        setRecipientName('');
-        setCertificateName('');
-        
-        setResponse({
-          isLoading: false,
-          isSuccess: false,
-          isError: false,
-          message: '',
-        });
-      }, 5000);
-    } catch (error) {
-      // Simulate error
-      setResponse({
-        isLoading: false,
-        isSuccess: false,
-        isError: true,
-        message: 'Failed to issue the certificate. Please try again.',
-      });
-    }
-  };
+	const handleSingleSubmit = useCallback(async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!isSingleFormComplete) return;
 
-  // Placeholder function to handle bulk certificate issuance
-  const handleStartBatch = async () => {
-    if (csvPreviewData.length === 0) {
-      toast({
-        title: 'Error',
-        description: 'No CSV data to process',
-        variant: 'destructive',
-      });
-      return;
-    }
+		setSingleResponse({ isLoading: true, isSuccess: false, isError: false, message: 'Queueing certificate...' });
 
-    setBatchResponse({
-      isLoading: true,
-      isSuccess: false,
-      isError: false,
-      message: 'Starting batch issuance process...',
-    });
+		try {
+			// TODO: Replace with actual API call using Redux Thunk later
+			console.log("Submitting Single Issue:", { singleFile, singleCertificateName, singleRecipientName, singleRecipientEmail });
+			await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
 
-    try {
-      // Simulate API call to start batch
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock batch ID
-      const mockBatchId = `BATCH-${Date.now().toString().substring(9)}`;
-      setBatchId(mockBatchId);
-      setIsBatchStarted(true);
-      
-      setBatchProgress({
-        total: csvPreviewData.length,
-        completed: 0,
-        success: 0,
-        failed: 0,
-      });
-      
-      // Show success message
-      setBatchResponse({
-        isLoading: false,
-        isSuccess: true,
-        isError: false,
-        message: `Batch issuance started with ID: ${mockBatchId}. Processing ${csvPreviewData.length} certificates.`,
-      });
+			const mockTaskId = `task_single_${Date.now()}`;
+			// Simulate success response from backend queueing endpoint
+			setSingleResponse({
+				isLoading: false,
+				isSuccess: true, // Indicates queuing was successful
+				isError: false,
+				message: `Certificate successfully queued for issuance. Task ID: ${mockTaskId}`,
+			});
+			toast({ title: 'Success', description: 'Certificate queued.' });
 
-      // Simulate WebSocket updates for each row
-      csvPreviewData.forEach((row, index) => {
-        setTimeout(() => {
-          // Create a copy of the current state
-          setCsvPreviewData(prevData => {
-            const newData = [...prevData];
-            const isSuccess = Math.random() > 0.2; // 80% success rate for demo
-            
-            // Update task for this row
-            newData[index] = {
-              ...newData[index],
-              task: {
-                taskId: `TID-${mockBatchId}-${index}`,
-                status: isSuccess ? 'success' : 'failed',
-                message: isSuccess ? 'Certificate issued successfully' : 'Failed to issue certificate',
-                txHash: isSuccess ? `0x${Math.random().toString(16).substring(2, 10)}` : undefined,
-                error: isSuccess ? undefined : 'Transaction rejected',
-              }
-            };
-            return newData;
-          });
+			// Reset form fields after successful queuing
+			setSingleFile(null);
+			setSingleRecipientEmail('');
+			setSingleRecipientName('');
+			setSingleCertificateName('');
+			// Optionally clear the response message after a delay
+			// setTimeout(() => setSingleResponse({ isLoading: false, isSuccess: false, isError: false, message: '' }), 5000);
 
-          // Update batch progress
-          setBatchProgress(prev => ({
-            ...prev,
-            completed: prev.completed + 1,
-            success: prev.success + (isSuccess ? 1 : 0),
-            failed: prev.failed + (isSuccess ? 0 : 1),
-          }));
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : 'Failed to queue certificate.';
+			setSingleResponse({ isLoading: false, isSuccess: false, isError: true, message: errorMsg });
+			toast({ title: 'Error', description: errorMsg, variant: 'destructive' });
+		}
+	}, [isSingleFormComplete, singleFile, singleCertificateName, singleRecipientName, singleRecipientEmail, toast]);
 
-        }, (index + 1) * 1000); // Stagger updates for demo
-      });
+	// --- Handlers for Bulk Issuance ---
+	const handleBulkCsvSelect = useCallback((selectedFile: File) => {
+		setBulkCsvFile(selectedFile);
+		setBulkShowPreview(false);
+		setBulkPreviewData([]);
+		setBulkTrackedTasks({}); // Clear tracked tasks
+		setBulkIsBatchStarted(false); // Reset batch status
+		setBulkBatchId(null);
+		setBulkBatchResponse({ isLoading: false, isSuccess: false, isError: false, message: '' });
+		setBulkBatchProgress({ total: 0, processed: 0, success: 0, failed: 0 });
+	}, []);
 
-    } catch (error) {
-      setBatchResponse({
-        isLoading: false,
-        isSuccess: false,
-        isError: true,
-        message: 'Failed to start batch issuance. Please try again.',
-      });
-    }
-  };
+	const handleBulkPreview = useCallback(async () => {
+		if (!bulkCsvFile) return;
+		setBulkIsPreviewLoading(true);
+		setBulkShowPreview(false); // Hide previous preview if any
+		setBulkPreviewData([]);
+		setBulkTrackedTasks({});
+		setBulkHasPreviewRowErrors(false);
 
-  // Reset batch state
-  const handleResetBatch = () => {
-    setCsvFile(null);
-    setGoogleDriveLink('');
-    setShowPreview(false);
-    setCsvPreviewData([]);
-    setIsBatchStarted(false);
-    setBatchId(null);
-    setBatchResponse({
-      isLoading: false,
-      isSuccess: false,
-      isError: false,
-      message: '',
-    });
-    setBatchProgress({
-      total: 0,
-      completed: 0,
-      success: 0,
-      failed: 0,
-    });
-  };
+		try {
+			// TODO: Replace with actual API call to /bulk-issue-preview
+			console.log("Previewing CSV:", bulkCsvFile.name);
+			await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
 
-  // Render status badge for bulk issuance rows
-  const renderStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="secondary">Pending</Badge>;
-      case 'processing':
-        return <Badge variant="secondary" className="bg-blue-500 hover:bg-blue-600">Processing</Badge>;
-      case 'waiting_wallet':
-        return <Badge variant="secondary" className="bg-orange-500 hover:bg-orange-600">Waiting</Badge>;
-      case 'success':
-        return <Badge className="bg-success hover:bg-success/90">Success</Badge>;
-      case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
-    }
-  };
+			// Mock parsed data from backend
+			const mockData: CsvRowData[] = Array.from({ length: 8 + Math.floor(Math.random() * 10) }, (_, i) => ({
+				rowNumber: i + 1,
+				'Roll No': `R${1000 + i}`, // Use correct header casing
+				'Recipient Name': `Bulk Student ${i + 1}`,
+				'Recipient Email': `bulk${i + 1}@test.com`,
+				'Certificate Name/Type': i % 2 === 0 ? 'Bulk Cert Alpha' : 'Bulk Cert Beta',
+				'Issue Date': `2025-0${i % 9 + 1}-1${i % 3 + 0}`,
+				'Certificate Link': i === 3 ? 'INVALID_LINK' : i % 3 === 0 ? `R${1000 + i}.pdf` : `https://drive.google.com/file/d/FAKE_ID_${i}/view`,
+				// 'Certificate Link': `https://drive.google.com/file/d/FAKE_ID_2/view`,
+				Grade: ['A', 'B+', 'A-', 'C', 'B'][i % 5],
+				// Add mock validation error for demonstration
+				_validationError: i === 3 ? "Invalid Certificate Link format." : undefined,
+				// _validationError: i === 1 ? "Invalid Certificate Link format." : undefined,
+			}));
 
-  const isFormComplete = file && recipientEmail && recipientName && certificateName;
+			setBulkPreviewData(mockData);
+			setBulkHasPreviewRowErrors(mockData.some(row => row._validationError));
+			setBulkShowPreview(true);
+			toast({ title: 'Preview Ready', description: `${mockData.length} records loaded.` });
 
-  return (
-    <DashboardLayout requiredRole="issuer">
-      <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Issue Certificate</h1>
-          <p className="text-muted-foreground">
-            Upload certificates to be hashed and stored on the blockchain
-          </p>
-        </div>
-        
-        <Tabs 
-          defaultValue="single" 
-          value={activeTab} 
-          onValueChange={setActiveTab}
-          className="w-full"
-        >
-          <TabsList className="mb-6">
-            <TabsTrigger value="single" className="flex items-center gap-2">
-              <FileUp className="h-4 w-4" />
-              <span>Single Certificate</span>
-            </TabsTrigger>
-            <TabsTrigger value="bulk" className="flex items-center gap-2">
-              <Sheet className="h-4 w-4" />
-              <span>Bulk Issue via CSV</span>
-            </TabsTrigger>
-          </TabsList>
-          
-          {/* Single Certificate Tab Content */}
-          <TabsContent value="single" className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="flex flex-col gap-6">
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle>Upload Certificate</CardTitle>
-                    <CardDescription>
-                      Upload the certificate document you want to issue
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <UploadArea
-                      onFileSelect={handleFileSelect}
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      label="Upload Certificate"
-                      sublabel="Drag and drop or click to browse"
-                    />
-                  </CardContent>
-                </Card>
-                
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle>Certificate Details</CardTitle>
-                    <CardDescription>
-                      Enter the recipient information and certificate details
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form id="issue-form" onSubmit={handleSingleIssuance} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="certificate-name">Certificate Name</Label>
-                        <Input
-                          id="certificate-name"
-                          placeholder="e.g. Bachelor of Science in Computer Science"
-                          value={certificateName}
-                          onChange={(e) => setCertificateName(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="recipient-name">Recipient Name</Label>
-                        <Input
-                          id="recipient-name"
-                          placeholder="Full name of the certificate recipient"
-                          value={recipientName}
-                          onChange={(e) => setRecipientName(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="recipient-email">Recipient Email</Label>
-                        <Input
-                          id="recipient-email"
-                          type="email"
-                          placeholder="Email address for notification"
-                          value={recipientEmail}
-                          onChange={(e) => setRecipientEmail(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          The recipient will receive an email notification when the certificate is issued
-                        </p>
-                      </div>
-                    </form>
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      type="submit" 
-                      form="issue-form" 
-                      className="w-full" 
-                      disabled={!isFormComplete || response.isLoading}
-                    >
-                      {response.isLoading ? (
-                        <>
-                          <span className="mr-2">Issuing</span>
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        </>
-                      ) : (
-                        <>
-                          <Send className="mr-2 h-4 w-4" />
-                          Issue Certificate
-                        </>
-                      )}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </div>
-              
-              <div className="flex flex-col gap-6">
-                {(response.isLoading || response.isSuccess || response.isError) && (
-                  <ResponseBox
-                    isLoading={response.isLoading}
-                    isSuccess={response.isSuccess}
-                    isError={response.isError}
-                    message={response.message}
-                    title={
-                      response.isLoading ? "Processing" :
-                      response.isSuccess ? "Certificate Queued" :
-                      "Issue Failed"
-                    }
-                  />
-                )}
-                
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle>How It Works</CardTitle>
-                    <CardDescription>
-                      The certificate issuance process explained
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        1
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Upload Certificate</p>
-                        <p className="text-xs text-muted-foreground">
-                          Upload the digital certificate document (PDF, JPG, PNG)
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        2
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Enter Details</p>
-                        <p className="text-xs text-muted-foreground">
-                          Add recipient information and certificate details
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        3
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Hash Computation</p>
-                        <p className="text-xs text-muted-foreground">
-                          System computes a unique hash of the certificate content
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        4
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Blockchain Storage</p>
-                        <p className="text-xs text-muted-foreground">
-                          Hash is stored on the blockchain for permanent verification
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        5
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Notification</p>
-                        <p className="text-xs text-muted-foreground">
-                          Recipient receives an email with certificate information
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <h3 className="text-sm font-medium mb-1">Important Note</h3>
-                      <p className="text-xs text-muted-foreground">
-                        Once a certificate is issued on the blockchain, it cannot be modified or deleted. 
-                        Please ensure all information is accurate before issuing.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-          
-          {/* Bulk Issuance via CSV Tab Content */}
-          <TabsContent value="bulk" className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="flex flex-col gap-6">
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle>Upload Batch File</CardTitle>
-                    <CardDescription>
-                      Upload a CSV file containing certificate details
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <UploadArea
-                      onFileSelect={handleCsvFileSelect}
-                      accept=".csv"
-                      label="Upload CSV File"
-                      sublabel="Drag and drop or click to browse"
-                      isLoading={isPreviewLoading}
-                    />
-                    
-                    {csvFile && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="drive-folder-link">Google Drive Folder Link (Optional)</Label>
-                          <Input
-                            id="drive-folder-link"
-                            placeholder="https://drive.google.com/drive/folders/..."
-                            value={googleDriveLink}
-                            onChange={(e) => setGoogleDriveLink(e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Provide this link if your CSV 'Certificate Link' column contains filenames instead of direct file URLs.
-                          </p>
-                        </div>
-                        
-                        <Button 
-                          onClick={handlePreviewCsv} 
-                          className="w-full"
-                          disabled={!csvFile || isPreviewLoading}
-                        >
-                          {isPreviewLoading ? (
-                            <>
-                              <span className="mr-2">Parsing CSV</span>
-                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="mr-2 h-4 w-4" />
-                              Upload & Preview CSV
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-                
-                {showPreview && csvFile && (
-                  <Card className="glass-card">
-                    <CardHeader>
-                      <CardTitle>
-                        <div className="flex justify-between items-center">
-                          <span>Batch Preview & Status</span>
-                          {isBatchStarted && batchProgress.total > 0 && (
-                            <Badge variant="outline" className="ml-2">
-                              {batchProgress.completed} / {batchProgress.total} Processed
-                            </Badge>
-                          )}
-                        </div>
-                      </CardTitle>
-                      <CardDescription className="flex items-center justify-between">
-                        <span>Review the parsed data and track issuance progress</span>
-                        <span className="text-xs font-medium">{csvFile.name}</span>
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="border rounded-md h-[400px] overflow-y-auto">
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-card z-10">
-                            <TableRow>
-                              <TableHead className="w-12">#</TableHead>
-                              <TableHead className="w-20">Roll No</TableHead>
-                              <TableHead>Recipient Name</TableHead>
-                              <TableHead>Recipient Email</TableHead>
-                              <TableHead>Certificate Name</TableHead>
-                              <TableHead>Certificate Link</TableHead>
-                              <TableHead className="w-32">Task ID</TableHead>
-                              <TableHead className="w-24">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {csvPreviewData.map((row) => (
-                              <TableRow key={row.rowNumber} className={row.certificateLink.includes('Invalid') ? 'bg-destructive/5' : ''}>
-                                <TableCell>{row.rowNumber}</TableCell>
-                                <TableCell>{row.rollNo}</TableCell>
-                                <TableCell>{row.recipientName}</TableCell>
-                                <TableCell>{row.recipientEmail}</TableCell>
-                                <TableCell>{row.certificateName}</TableCell>
-                                <TableCell className={row.certificateLink.includes('Invalid') ? 'text-destructive' : ''}>
-                                  {row.certificateLink}
-                                </TableCell>
-                                <TableCell>{row.task?.taskId || '-'}</TableCell>
-                                <TableCell>
-                                  {row.task ? renderStatusBadge(row.task.status) : <Badge variant="outline">Pending</Badge>}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex gap-3">
-                      <Button
-                        onClick={handleStartBatch}
-                        disabled={isPreviewLoading || isBatchStarted}
-                        className="flex-1"
-                      >
-                        {batchResponse.isLoading ? (
-                          <>
-                            <span className="mr-2">Starting</span>
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          </>
-                        ) : (
-                          <>
-                            <Play className="mr-2 h-4 w-4" />
-                            Start Issuance Batch
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={handleResetBatch} 
-                        className="flex-1"
-                      >
-                        Cancel Batch / Clear Preview
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                )}
-              </div>
-              
-              <div className="flex flex-col gap-6">
-                {(batchResponse.isLoading || batchResponse.isSuccess || batchResponse.isError) && (
-                  <ResponseBox
-                    isLoading={batchResponse.isLoading}
-                    isSuccess={batchResponse.isSuccess}
-                    isError={batchResponse.isError}
-                    message={batchResponse.message}
-                    title={
-                      batchResponse.isLoading ? "Processing Batch" :
-                      batchResponse.isSuccess ? "Batch Initiated" :
-                      "Batch Failed"
-                    }
-                  />
-                )}
-                
-                {isBatchStarted && batchProgress.total > 0 && (
-                  <Card className="glass-card bg-muted/10">
-                    <CardHeader>
-                      <CardTitle>Batch Processing Status</CardTitle>
-                      <CardDescription>
-                        Real-time status of your certificate batch
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Batch ID:</span>
-                        <span className="font-mono text-sm">{batchId}</span>
-                      </div>
-                      
-                      <div className="w-full bg-muted/30 rounded-full h-2.5">
-                        <div 
-                          className="bg-primary h-2.5 rounded-full transition-all duration-500 ease-out" 
-                          style={{ width: `${(batchProgress.completed / batchProgress.total) * 100}%` }}
-                        ></div>
-                      </div>
-                      
-                      <div className="flex justify-between text-sm">
-                        <span>{batchProgress.completed} of {batchProgress.total} Completed</span>
-                        <span>{Math.round((batchProgress.completed / batchProgress.total) * 100)}%</span>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 mt-4">
-                        <div className="flex items-center gap-2 p-3 rounded-md bg-success/10 border border-success/20">
-                          <div className="h-3 w-3 rounded-full bg-success"></div>
-                          <span className="text-sm font-medium">Success: {batchProgress.success}</span>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                          <div className="h-3 w-3 rounded-full bg-destructive"></div>
-                          <span className="text-sm font-medium">Failed: {batchProgress.failed}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle>Bulk Issuance Guide</CardTitle>
-                    <CardDescription>
-                      How to use the bulk certificate issuance feature
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        1
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Prepare Your CSV</p>
-                        <p className="text-xs text-muted-foreground">
-                          Create a CSV with columns: Roll No, Recipient Name, Recipient Email, Certificate Name, Certificate Link
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        2
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Upload & Preview</p>
-                        <p className="text-xs text-muted-foreground">
-                          Upload your CSV and optionally link to a Google Drive folder containing certificate files
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        3
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Review the Data</p>
-                        <p className="text-xs text-muted-foreground">
-                          Check the parsed data in the preview table and ensure all information is correct
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        4
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Start the Batch</p>
-                        <p className="text-xs text-muted-foreground">
-                          Initiate the batch process to issue all certificates in one go
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        5
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Monitor Progress</p>
-                        <p className="text-xs text-muted-foreground">
-                          Track the status of each certificate in real-time as they are processed
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <h3 className="text-sm font-medium mb-1">CSV Format Requirements</h3>
-                      <p className="text-xs text-muted-foreground">
-                        Your CSV must include headers and contain at least the following columns: 
-                        <span className="font-mono text-[10px] ml-1">Roll No, Recipient Name, Recipient Email, Certificate Name, Certificate Link</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </DashboardLayout>
-  );
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : 'Failed to preview CSV.';
+			toast({ title: 'Preview Error', description: errorMsg, variant: 'destructive' });
+		} finally {
+			setBulkIsPreviewLoading(false);
+		}
+	}, [bulkCsvFile, toast]);
+
+	const handleBulkStart = useCallback(async () => {
+		if (bulkPreviewData.length === 0 || bulkHasPreviewRowErrors) {
+			toast({ title: 'Error', description: 'Cannot start batch. Please preview a valid CSV first.', variant: 'destructive' });
+			return;
+		}
+
+		setBulkIsBatchStarting(true);
+		setBulkBatchResponse({ isLoading: true, isSuccess: false, isError: false, message: 'Initiating batch issuance...' });
+
+		try {
+			// TODO: Replace with actual API call to /bulk-issue-start
+			console.log("Starting Bulk Batch:", { batchData: bulkPreviewData, folderLink: bulkDriveLink, fileName: bulkCsvFile?.name });
+			await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+
+			// Mock response from backend
+			const mockBatchId = `batch_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`;
+			const mockTaskIds = bulkPreviewData.map(row => `task_${mockBatchId}_${row['Roll No']}`);
+
+			setBulkBatchId(mockBatchId);
+			setBulkIsBatchStarted(true); // Mark batch as active for processing/WS updates
+			setBulkBatchProgress({ // Initialize progress
+				total: bulkPreviewData.length,
+				processed: 0,
+				success: 0,
+				failed: 0,
+			});
+			// Initialize tracked tasks state based on preview data
+			const initialTasks: { [taskId: string]: TrackedIssuanceTask } = {};
+			bulkPreviewData.forEach((row, index) => {
+				const taskId = mockTaskIds[index]; // Use the generated taskId
+				// Create initial tracked task state from preview data
+				initialTasks[taskId] = {
+					...row, // Spread the CsvRowData
+					taskId: taskId,
+					batchId: mockBatchId, // <-- ADD THIS LINE
+					status: 'queued', // Start as queued
+					message: 'Queued for processing',
+					lastUpdated: new Date().toISOString(),
+				};
+			});
+			setBulkTrackedTasks(initialTasks);
+
+
+			setBulkBatchResponse({
+				isLoading: false,
+				isSuccess: true,
+				isError: false,
+				message: `Batch ${mockBatchId} started with ${bulkPreviewData.length} tasks queued.`,
+			});
+			toast({ title: 'Batch Started', description: `${bulkPreviewData.length} certificates queued.` });
+
+			// NOTE: The actual processing simulation is now handled by the useMockWebSocket hook
+
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : 'Failed to start batch issuance.';
+			setBulkBatchResponse({ isLoading: false, isSuccess: false, isError: true, message: errorMsg });
+			toast({ title: 'Batch Start Error', description: errorMsg, variant: 'destructive' });
+		} finally {
+			setBulkIsBatchStarting(false);
+		}
+	}, [bulkPreviewData, bulkDriveLink, bulkCsvFile?.name, toast, bulkHasPreviewRowErrors]);
+
+	const handleBulkReset = useCallback(() => {
+		setBulkCsvFile(null);
+		setBulkDriveLink('');
+		setBulkShowPreview(false);
+		setBulkPreviewData([]);
+		setBulkTrackedTasks({});
+		setBulkIsBatchStarted(false);
+		setBulkIsBatchStarting(false);
+		setBulkBatchId(null);
+		setBulkBatchResponse({ isLoading: false, isSuccess: false, isError: false, message: '' });
+		setBulkBatchProgress({ total: 0, processed: 0, success: 0, failed: 0 });
+		setBulkHasPreviewRowErrors(false);
+		console.log("Bulk state reset");
+	}, []);
+
+	// --- Mock WebSocket Hook ---
+	// Pass the raw preview data to the hook for simulation purposes
+	useMockWebSocket(bulkIsBatchStarted, bulkBatchId, bulkPreviewData, setBulkTrackedTasks, setBulkBatchProgress);
+
+	// --- Convert tracked tasks map to array for table rendering ---
+	// Memoize this conversion for performance
+	const trackedTasksArray = React.useMemo(() => {
+		// If preview is shown but batch not started, use preview data directly
+		if (bulkShowPreview && !bulkIsBatchStarted) {
+			// Create initial task structure from preview data before batch starts
+			return bulkPreviewData.map((row): TrackedIssuanceTask => {
+				// *** FIX: Explicitly cast the status value ***
+				const initialStatus: IssuanceJobStatus = row._validationError ? 'failed' : 'pending';
+				return {
+					...row, // Spread CsvRowData
+					taskId: null,
+					batchId: null,
+					status: initialStatus, // Assign the correctly typed status
+					message: row._validationError || 'Ready for batch start',
+					lastUpdated: null,
+					hash: null,
+					txHash: null,
+					error: row._validationError || null,
+					walletAddress: null,
+				};
+			});
+		}
+		// Otherwise, use the tracked tasks state which gets updated by WS
+		return Object.values(bulkTrackedTasks);
+	}, [bulkShowPreview, bulkIsBatchStarted, bulkPreviewData, bulkTrackedTasks]);
+
+
+	// --- FIX THE BUG ---
+	// Correct the simulation logic inside handleStartBatch
+	const handleStartBatchCorrected = useCallback(async () => {
+		// ... (initial checks and setup as before) ...
+		setBulkIsBatchStarting(true);
+		setBulkBatchResponse({ isLoading: true, isSuccess: false, isError: false, message: 'Initiating batch issuance...' });
+
+		try {
+			await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+
+			const mockBatchId = `batch_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`;
+			const mockTaskIds = bulkPreviewData.map(row => `task_${mockBatchId}_${row['Roll No']}`);
+
+			setBulkBatchId(mockBatchId);
+			setBulkIsBatchStarted(true);
+			setBulkBatchProgress({ total: bulkPreviewData.length, processed: 0, success: 0, failed: 0 });
+
+			const initialTasks: { [taskId: string]: TrackedIssuanceTask } = {};
+			bulkPreviewData.forEach((row, index) => {
+				const taskId = mockTaskIds[index];
+				initialTasks[taskId] = {
+					...row,	// Spread the CsvRowData
+					taskId: taskId,
+					batchId: mockBatchId, // <-- ADD THIS LINE
+					status: 'queued',
+					message: 'Queued for processing',
+					lastUpdated: new Date().toISOString(),
+				};
+			});
+			setBulkTrackedTasks(initialTasks);
+
+			setBulkBatchResponse({ isLoading: false, isSuccess: true, isError: false, message: `Batch ${mockBatchId} started...` });
+			toast({ title: 'Batch Started', description: `${bulkPreviewData.length} certificates queued.` });
+
+			// --- Corrected Simulation Logic ---
+			// This part should ideally be replaced by the useMockWebSocket hook,
+			// but if keeping it here for testing, fix the 'isSuccess' reference.
+			bulkPreviewData.forEach((row, index) => {
+				const taskId = mockTaskIds[index]; // Get the correct taskId
+				const delay = (index + 1) * 1000 + Math.random() * 500; // Shorter delay maybe
+				setTimeout(() => {
+					// *** FIX IS HERE ***
+					const currentTaskIsSuccess = Math.random() > 0.2; // Use a locally scoped variable
+
+					setBulkTrackedTasks(prevTasks => {
+						// Ensure task exists before updating
+						if (!prevTasks[taskId]) return prevTasks;
+						return {
+							...prevTasks,
+							[taskId]: {
+								...prevTasks[taskId], // Keep existing row data
+								status: currentTaskIsSuccess ? 'success' : 'failed',
+								message: currentTaskIsSuccess ? 'Certificate issued successfully' : 'Failed: Mock transaction error',
+								txHash: currentTaskIsSuccess ? `0x${Math.random().toString(16).substring(2, 10)}` : undefined,
+								error: currentTaskIsSuccess ? undefined : 'Mock transaction rejected',
+								lastUpdated: new Date().toISOString(),
+							}
+						};
+					});
+
+					setBulkBatchProgress(prev => ({
+						...prev,
+						processed: prev.processed + 1,
+						success: prev.success + (currentTaskIsSuccess ? 1 : 0),
+						failed: prev.failed + (currentTaskIsSuccess ? 0 : 1),
+					}));
+
+				}, delay);
+			});
+			// --- End Corrected Simulation ---
+
+		} catch (error) {
+			setBulkBatchResponse({
+				isLoading: false,
+				isSuccess: false,
+				isError: true,
+				message: 'Failed to start batch issuance. Please try again.',
+			});
+
+		}
+		finally { setBulkIsBatchStarting(false); }
+	}, [bulkPreviewData, bulkDriveLink, bulkCsvFile?.name, toast, bulkHasPreviewRowErrors]);
+	// --- End Bug Fix ---
+
+	return (
+		<DashboardLayout requiredRole="issuer">
+			<div className="flex flex-col gap-8">
+				{/* Header */}
+				<div className="flex flex-col gap-2">
+					<h1 className="text-3xl font-bold tracking-tight">Issue Certificate</h1>
+					<p className="text-muted-foreground">
+						Upload certificates to be hashed and stored on the blockchain
+					</p>
+				</div>
+
+				{/* Tabs */}
+				<Tabs
+					defaultValue="single"
+					value={activeTab}
+					onValueChange={setActiveTab}
+					className="w-full"
+				>
+					<TabsList className="mb-6">
+						<TabsTrigger value="single" className="flex items-center gap-2">
+							<FileUp className="h-4 w-4" />
+							<span>Single Certificate</span>
+						</TabsTrigger>
+						<TabsTrigger value="bulk" className="flex items-center gap-2">
+							<Sheet className="h-4 w-4" />
+							<span>Bulk Issue via CSV</span>
+						</TabsTrigger>
+					</TabsList>
+
+					{/* Single Tab Content */}
+					<TabsContent value="single" className="space-y-8">
+						{/* Render SingleIssueForm, passing state and handlers */}
+						<SingleIssueForm
+							file={singleFile}
+							recipientEmail={singleRecipientEmail}
+							recipientName={singleRecipientName}
+							certificateName={singleCertificateName}
+							response={singleResponse}
+							isFormComplete={isSingleFormComplete}
+							onFileSelect={handleSingleFileSelect}
+							onRecipientEmailChange={setSingleRecipientEmail}
+							onRecipientNameChange={setSingleRecipientName}
+							onCertificateNameChange={setSingleCertificateName}
+							onSubmit={handleSingleSubmit} // Use the correct handler
+						/>
+						{/* HowItWorksCard is now rendered inside SingleIssueForm */}
+					</TabsContent>
+
+					{/* Bulk Tab Content */}
+					<TabsContent value="bulk" className="space-y-8">
+						<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+							{/* Column 1: Upload and Preview Table */}
+							<div className="flex flex-col gap-6">
+								<BulkIssueCsvUpload
+									csvFile={bulkCsvFile}
+									googleDriveLink={bulkDriveLink}
+									isPreviewLoading={bulkIsPreviewLoading}
+									onCsvFileSelect={handleBulkCsvSelect}
+									onGoogleDriveLinkChange={setBulkDriveLink}
+									onPreviewCsv={handleBulkPreview}
+								/>
+
+								{bulkShowPreview && bulkCsvFile && (
+									<BulkIssuePreviewTable
+										// Pass the memoized array of tracked tasks
+										tasks={trackedTasksArray}
+										csvFileName={bulkCsvFile.name}
+										isBatchStarted={bulkIsBatchStarted}
+										isBatchProcessing={bulkIsBatchStarting}
+										batchProgress={bulkBatchProgress}
+										hasPreviewRowErrors={bulkHasPreviewRowErrors}
+										// Pass the corrected handler for starting
+										onStartBatch={handleStartBatchCorrected}
+										onResetBatch={handleBulkReset}
+									/>
+								)}
+							</div>
+
+							{/* Column 2: Batch Progress and Guide */}
+							<div className="flex flex-col gap-6">
+								{/* Show overall batch response (e.g., "Batch Started") */}
+								{(bulkBatchResponse.isLoading || bulkBatchResponse.isSuccess || bulkBatchResponse.isError) && (
+									<ResponseBox
+										isLoading={bulkBatchResponse.isLoading}
+										isSuccess={bulkBatchResponse.isSuccess}
+										isError={bulkBatchResponse.isError}
+										message={bulkBatchResponse.message}
+										title={
+											bulkBatchResponse.isLoading ? "Processing Batch Request" :
+												bulkBatchResponse.isSuccess ? "Batch Update" :
+													"Batch Request Failed"
+										}
+									/>
+								)}
+
+								{/* Show detailed progress card only when batch is active */}
+								{bulkIsBatchStarted && (
+									<BatchProgressCard
+										batchId={bulkBatchId}
+										batchProgress={bulkBatchProgress}
+									/>
+								)}
+
+								<BulkGuideCard />
+							</div>
+						</div>
+					</TabsContent>
+				</Tabs>
+			</div>
+		</DashboardLayout>
+	);
 };
 
 export default Issue;
