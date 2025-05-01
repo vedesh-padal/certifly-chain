@@ -41,51 +41,51 @@ import { TrackedIssuanceTask, IssuanceStatusUpdatePayload, IssuanceState } from 
 import { ResponseBox } from '@/components/ui-custom/ResponseBox';
 
 // --- Mock WebSocket Hook (Keep for now, will connect to Redux later) ---
-const useMockWebSocket = (
-	isBatchStarted: boolean,
-	batchId: string | null,
-	initialPreviewDataLength: number, // Need length to simulate correct number
-	dispatch: AppDispatch // Pass dispatch to the hook
-) => {
-	useEffect(() => {
-		if (!isBatchStarted || !batchId || initialPreviewDataLength === 0) return;
+// const useMockWebSocket = (
+// 	isBatchStarted: boolean,
+// 	batchId: string | null,
+// 	initialPreviewDataLength: number, // Need length to simulate correct number
+// 	dispatch: AppDispatch // Pass dispatch to the hook
+// ) => {
+// 	useEffect(() => {
+// 		if (!isBatchStarted || !batchId || initialPreviewDataLength === 0) return;
 
-		console.log("Setting up MOCK WebSocket listeners for batch:", batchId);
-		const timeouts: NodeJS.Timeout[] = [];
+// 		console.log("Setting up MOCK WebSocket listeners for batch:", batchId);
+// 		const timeouts: NodeJS.Timeout[] = [];
 
-		// Simulate receiving updates for each task based on length
-		for (let i = 0; i < initialPreviewDataLength; i++) {
-			const mockRollNo = `R${1000 + i}`; // Reconstruct Roll No assumption
-			const taskId = `task_${batchId}_${mockRollNo}`; // Reconstruct taskId
-			const delay = (i + 1) * 1500 + Math.random() * 1000;
+// 		// Simulate receiving updates for each task based on length
+// 		for (let i = 0; i < initialPreviewDataLength; i++) {
+// 			const mockRollNo = `R${1000 + i}`; // Reconstruct Roll No assumption
+// 			const taskId = `task_${batchId}_${mockRollNo}`; // Reconstruct taskId
+// 			const delay = (i + 1) * 1500 + Math.random() * 1000;
 
-			timeouts.push(setTimeout(() => {
-				const isSuccess = Math.random() > 0.2;
-				const updatePayload: IssuanceStatusUpdatePayload = {
-					taskId: taskId,
-					batchId: batchId,
-					status: isSuccess ? 'success' : 'failed',
-					message: isSuccess ? 'Mock: Issued successfully' : 'Mock: Failed transaction',
-					rowData: { 'Roll No': mockRollNo, 'Recipient Name': `Mock Student ${i + 1}` },
-					timestamp: new Date().toISOString(),
-					txHash: isSuccess ? `0x${Math.random().toString(16).substring(2, 12)}` : undefined,
-					hash: isSuccess ? `0x${Math.random().toString(16).substring(2, 66)}` : undefined,
-					error: isSuccess ? undefined : 'Mock transaction rejected',
-					walletAddress: isSuccess ? `0xWallet${i % 2}` : undefined,
-				};
-				console.log("Simulating WS message:", updatePayload);
-				// Dispatch action to update Redux state
-				dispatch(updateTaskStatus(updatePayload));
-			}, delay));
-		}
+// 			timeouts.push(setTimeout(() => {
+// 				const isSuccess = Math.random() > 0.2;
+// 				const updatePayload: IssuanceStatusUpdatePayload = {
+// 					taskId: taskId,
+// 					batchId: batchId,
+// 					status: isSuccess ? 'success' : 'failed',
+// 					message: isSuccess ? 'Mock: Issued successfully' : 'Mock: Failed transaction',
+// 					rowData: { 'Roll No': mockRollNo, 'Recipient Name': `Mock Student ${i + 1}` },
+// 					timestamp: new Date().toISOString(),
+// 					txHash: isSuccess ? `0x${Math.random().toString(16).substring(2, 12)}` : undefined,
+// 					hash: isSuccess ? `0x${Math.random().toString(16).substring(2, 66)}` : undefined,
+// 					error: isSuccess ? undefined : 'Mock transaction rejected',
+// 					walletAddress: isSuccess ? `0xWallet${i % 2}` : undefined,
+// 				};
+// 				console.log("Simulating WS message:", updatePayload);
+// 				// Dispatch action to update Redux state
+// 				dispatch(updateTaskStatus(updatePayload));
+// 			}, delay));
+// 		}
 
-		return () => {
-			console.log("Cleaning up MOCK WebSocket listeners for batch:", batchId);
-			timeouts.forEach(clearTimeout);
-		};
-		// Depend on length instead of the full data array
-	}, [isBatchStarted, batchId, initialPreviewDataLength, dispatch]);
-};
+// 		return () => {
+// 			console.log("Cleaning up MOCK WebSocket listeners for batch:", batchId);
+// 			timeouts.forEach(clearTimeout);
+// 		};
+// 		// Depend on length instead of the full data array
+// 	}, [isBatchStarted, batchId, initialPreviewDataLength, dispatch]);
+// };
 // --- End Mock WebSocket Hook ---
 
 
@@ -410,7 +410,7 @@ const Issue: React.FC = () => {
 	// Pass previewData.length for simulation count
 	// We pass dispatch so the hook can dispatch 'updateTaskStatus'
 	// Note: This mock hook should be removed when real WebSockets are implemented
-	useMockWebSocket(isBatchStarted, currentBatchId, previewData.length, dispatch);
+	// useMockWebSocket(isBatchStarted, currentBatchId, previewData.length, dispatch);
 	// --- End Mock WebSocket Hook Setup ---
 
 

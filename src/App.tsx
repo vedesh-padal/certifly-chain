@@ -5,11 +5,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { connectSocket, disconnectSocket } from './lib/socketService';
 
 // --- Redux Imports ---
-import { Provider, useDispatch } from 'react-redux';
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store, AppDispatch } from './app/store';
-import { fetchUserOnLoad } from './features/auth/authSlice'
+import { fetchUserOnLoad, selectIsAuthenticated, selectAuthToken } from './features/auth/authSlice'
 // --- End Redux Imports ---
 
 import Login from "./pages/Login";
@@ -24,12 +25,32 @@ import NotFound from "./pages/NotFound";
 const AppContent = () => {
 	const dispatch = useDispatch<AppDispatch>();
 	const queryClient = new QueryClient();
+	const isAuthenticated = useSelector(selectIsAuthenticated);
+	const token = useSelector(selectAuthToken);
 
 	useEffect(() => {
 		// Attempt to fetch user based on stored token on initial app load
 		console.log("App.tsx: Dispatching fetchUserOnLoad on initial mount");
 		dispatch(fetchUserOnLoad());
 	}, [dispatch]);
+
+	// --- Effect for Socket Connection Management ---
+	useEffect(() => {
+		if (isAuthenticated && token) {
+			console.log("App.tsx: User authenticated, connecting socket...");
+			connectSocket(token); // Connect with the current token
+		} else {
+			console.log("App.tsx: User not authenticated, disconnecting socket...");
+			disconnectSocket(); // Disconnect if not authenticated or no token
+		}
+
+		// Cleanup function for when component unmounts or dependencies change
+		return () => {
+			console.log("App.tsx: Cleaning up socket effect, disconnecting socket.");
+			disconnectSocket();
+		};
+	}, [isAuthenticated, token]); // Re-run effect if auth status or token changes
+	// --- End Socket Connection Management ---
 
 	return (
 		<QueryClientProvider client={queryClient}>
