@@ -1,5 +1,5 @@
-// src/features/issuance/issuanceSlice.ts
 import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
+import axios, { AxiosError } from 'axios'
 import type { RootState } from '../../app/store'; // Import RootState for selectors
 import {
 	ResponseState,
@@ -48,36 +48,57 @@ const initialState: IssuanceState = {
 	},
 };
 
-// --- Async Thunks (Placeholders - Implement API calls later) ---
+const API_BASE_URL = 'http://localhost:3001/api';
+
+// --- Helper to get token ---
+const getToken = (getState: () => RootState): string | null => {
+	// Assuming token is stored in authSlice state
+	return getState().auth.token;
+};
+
+
+// --- Async Thunks ---
+// ... (previewCsvFile, startIssuanceBatch - keep placeholders for now) ...
 
 // Thunk for handling CSV Preview API call
 export const previewCsvFile = createAsyncThunk(
 	'issuance/previewCsv',
-	async (formData: FormData, { rejectWithValue }) => {
-		// TODO: Replace with actual API call to POST /api/certificates/bulk-issue-preview
-		console.log('Thunk: previewCsvFile executing with FormData');
+	// Payload expects FormData containing the csvFile
+	async (payload: { formData: FormData }, { getState, rejectWithValue }) => {
+		const token = getToken(getState as () => RootState);
+		if (!token) return rejectWithValue('Not authenticated');
+
+		console.log('Thunk: previewCsvFile executing...');
 		try {
-			await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API delay
-			// Simulate successful response with mock data
-			const mockData: CsvRowData[] = Array.from({ length: 8 + Math.floor(Math.random() * 10) }, (_, i) => ({
-				rowNumber: i + 1,
-				'Roll No': `R${1000 + i}`,
-				'Recipient Name': `Bulk Student ${i + 1}`,
-				'Recipient Email': `bulk${i + 1}@test.com`,
-				'Certificate Name/Type': i % 2 === 0 ? 'Bulk Cert Alpha' : 'Bulk Cert Beta',
-				'Issue Date': `2025-0${i % 9 + 1}-1${i % 3 + 0}`,
-				// 'Certificate Link': i === 3 ? 'INVALID_LINK' : i % 3 === 0 ? `R${1000 + i}.pdf` : `https://drive.google.com/file/d/FAKE_ID_${i}/view`,
-				'Certificate Link': `https://drive.google.com/file/d/FAKE_ID_1/view`,
-				Grade: ['A', 'B+', 'A-', 'C', 'B'][i % 5],
-				// _validationError: i === 3 ? "Invalid Certificate Link format." : undefined,
-			}));
-			const hasErrors = mockData.some(row => row._validationError);
-			console.log('Thunk: previewCsvFile mock success');
-			// Return data expected by the 'fulfilled' reducer
-			return { data: mockData, hasRowErrors: hasErrors };
+			// Make actual API call
+			const response = await axios.post<{ message: string; data: CsvRowData[]; fileName: string; hasRowErrors: boolean }>(
+				`${API_BASE_URL}/certificates/bulk-issue-preview`,
+				payload.formData, // Send FormData
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+						// Axios sets Content-Type for FormData
+					}
+				}
+			);
+
+			// Check response structure (backend sends data array directly)
+			if (!response.data || !Array.isArray(response.data.data)) {
+				throw new Error('Invalid response structure from CSV preview API');
+			}
+
+			console.log('Thunk: previewCsvFile API call successful', response.data);
+			// Return the relevant data for the fulfilled reducer
+			return {
+				data: response.data.data,
+				hasRowErrors: response.data.hasRowErrors
+			};
+
 		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Failed to preview CSV';
-			console.error('Thunk: previewCsvFile error', error);
+			console.error('Thunk: previewCsvFile API error', error);
+			const message = error instanceof AxiosError
+				? error.response?.data?.message || error.message
+				: error instanceof Error ? error.message : 'Failed to preview CSV';
 			return rejectWithValue(message);
 		}
 	}
@@ -86,19 +107,47 @@ export const previewCsvFile = createAsyncThunk(
 // Thunk for handling Start Batch API call
 export const startIssuanceBatch = createAsyncThunk(
 	'issuance/startBatch',
-	async (payload: { batchData: CsvRowData[], folderLink: string, fileName: string | undefined }, { rejectWithValue }) => {
-		// TODO: Replace with actual API call to POST /api/certificates/bulk-issue-start
-		console.log('Thunk: startIssuanceBatch executing with payload:', payload);
+	// Payload matches what the component sends
+	async (payload: { batchData: CsvRowData[], folderLink: string | null, fileName: string | undefined }, { getState, rejectWithValue }) => {
+		const token = getToken(getState as () => RootState);
+		if (!token) return rejectWithValue('Not authenticated');
+
+		console.log('Thunk: startIssuanceBatch executing...');
 		try {
-			await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
-			// Simulate successful response from backend
-			const mockBatchId = `batch_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`;
-			const mockTaskIds = payload.batchData.map(row => `task_${mockBatchId}_${row['Roll No']}`);
-			console.log('Thunk: startIssuanceBatch mock success');
-			return { batchId: mockBatchId, taskIds: mockTaskIds, totalTasks: payload.batchData.length };
+			// Make actual API call, sending JSON body
+			const response = await axios.post<{ message: string; batchId: string; taskIds: string[] }>(
+				`${API_BASE_URL}/certificates/bulk-issue-start`,
+				{ // Send JSON payload
+					batchData: payload.batchData,
+					folderLink: payload.folderLink || null, // Send null if empty string
+					fileName: payload.fileName
+				},
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+						'Content-Type': 'application/json', // Explicitly set for JSON
+					}
+				}
+			);
+
+			// Check response structure
+			if (response.status !== 202 || !response.data.batchId || !response.data.taskIds) {
+				throw new Error('Invalid response structure from start batch API');
+			}
+
+			console.log('Thunk: startIssuanceBatch API call successful', response.data);
+			// Return data needed by fulfilled reducer
+			return {
+				batchId: response.data.batchId,
+				taskIds: response.data.taskIds,
+				totalTasks: response.data.taskIds.length // Calculate total from response
+			};
+
 		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Failed to start batch';
-			console.error('Thunk: startIssuanceBatch error', error);
+			console.error('Thunk: startIssuanceBatch API error', error);
+			const message = error instanceof AxiosError
+				? error.response?.data?.message || error.message
+				: error instanceof Error ? error.message : 'Failed to start batch';
 			return rejectWithValue(message);
 		}
 	}
@@ -107,20 +156,45 @@ export const startIssuanceBatch = createAsyncThunk(
 // Thunk for handling Single Issue API call
 export const submitSingleIssue = createAsyncThunk(
 	'issuance/submitSingle',
-	async (payload: { formData: FormData }, { rejectWithValue }) => {
-		// TODO: Replace with actual API call to POST /api/certificates/issue
-		console.log('Thunk: submitSingleIssue executing with FormData');
-		// Note: Accessing FormData content directly in JS is tricky for logging
-		// You'd typically log on the server side after receiving it.
+	// Payload now expects FormData directly
+	async (payload: { formData: FormData }, { getState, rejectWithValue }) => {
+		const token = getToken(getState as () => RootState);
+		if (!token) return rejectWithValue('Not authenticated');
+
+		console.log('Thunk: submitSingleIssue executing...');
+		// Log FormData entries (for debugging - browser only)
+		// for (let [key, value] of payload.formData.entries()) {
+		//     console.log(`FormData Entry: ${key}`, value);
+		// }
+
 		try {
-			await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
-			// Simulate successful response from backend
-			const mockTaskId = `task_single_${Date.now()}`;
-			console.log('Thunk: submitSingleIssue mock success');
-			return { taskId: mockTaskId }; // Return data needed by fulfilled reducer
+			// Make the actual API call
+			const response = await axios.post<{ status: string; taskId: string }>(
+				`${API_BASE_URL}/certificates/issue`,
+				payload.formData, // Send FormData directly
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+						// 'Content-Type': 'multipart/form-data' // Axios sets this automatically for FormData
+					}
+				}
+			);
+
+			// Check response status code (Axios throws for non-2xx)
+			// Expecting 202 Accepted from backend
+			if (response.status !== 202 || !response.data.taskId) {
+				throw new Error('Invalid response structure from single issue API');
+			}
+
+			console.log('Thunk: submitSingleIssue API call successful', response.data);
+			// Return data needed by fulfilled reducer
+			return { taskId: response.data.taskId };
+
 		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Failed to queue single certificate';
-			console.error('Thunk: submitSingleIssue error', error);
+			console.error('Thunk: submitSingleIssue API error', error);
+			const message = error instanceof AxiosError
+				? error.response?.data?.message || error.message
+				: error instanceof Error ? error.message : 'Failed to queue single certificate';
 			return rejectWithValue(message);
 		}
 	}
@@ -130,8 +204,7 @@ export const submitSingleIssue = createAsyncThunk(
 // --- Create Slice ---
 export const issuanceSlice = createSlice({
 	name: 'issuance',
-	initialState,
-	// Reducers for synchronous actions
+	initialState, // Ensure initialState includes singleResponseState and singleLastTaskId
 	reducers: {
 		// Single Issuance Reducers
 		setSingleFile: (state, action: PayloadAction<File | null>) => {
@@ -258,13 +331,15 @@ export const issuanceSlice = createSlice({
 			// --- Single Issue Thunk ---
 			.addCase(submitSingleIssue.pending, (state) => {
 				state.singleResponseState = { isLoading: true, isSuccess: false, isError: false, message: 'Queueing certificate...' };
+				state.singleLastTaskId = null;
 			})
-			.addCase(submitSingleIssue.fulfilled, (state, action) => {
+			.addCase(submitSingleIssue.fulfilled, (state, action: PayloadAction<{ taskId: string }>) => {
 				state.singleResponseState = { isLoading: false, isSuccess: true, isError: false, message: `Certificate queued. Task ID: ${action.payload.taskId}` };
 				state.singleLastTaskId = action.payload.taskId;
 			})
 			.addCase(submitSingleIssue.rejected, (state, action) => {
 				state.singleResponseState = { isLoading: false, isSuccess: false, isError: true, message: action.payload as string ?? 'Failed to queue certificate.' };
+				state.singleLastTaskId = null;
 			})
 
 			// --- CSV Preview Thunk ---
@@ -274,10 +349,10 @@ export const issuanceSlice = createSlice({
 				state.previewData = [];
 				state.hasPreviewRowErrors = false;
 			})
-			.addCase(previewCsvFile.fulfilled, (state, action) => {
+			.addCase(previewCsvFile.fulfilled, (state, action: PayloadAction<{ data: CsvRowData[], hasRowErrors: boolean }>) => {
 				state.isPreviewLoading = false;
-				state.previewData = action.payload.data;
-				state.hasPreviewRowErrors = action.payload.hasRowErrors;
+				state.previewData = action.payload.data; // Store parsed data
+				state.hasPreviewRowErrors = action.payload.hasRowErrors; // Store error flag
 				state.previewError = null;
 			})
 			.addCase(previewCsvFile.rejected, (state, action) => {
@@ -289,45 +364,53 @@ export const issuanceSlice = createSlice({
 
 			// --- Start Batch Thunk ---
 			.addCase(startIssuanceBatch.pending, (state) => {
-				state.isBatchStarting = true; // Set starting flag
+				state.isBatchStarting = true;
 				state.startBatchError = null;
 				state.currentBatchId = null;
-				state.isBatchStarted = false; // Ensure not marked as started yet
+				state.isBatchStarted = false;
 				state.trackedTasks = {};
 				state.batchProgress = initialState.batchProgress;
 			})
-			.addCase(startIssuanceBatch.fulfilled, (state, action) => {
-				state.isBatchStarting = false; // Clear starting flag
+			// Update fulfilled case payload type
+			.addCase(startIssuanceBatch.fulfilled, (state, action: PayloadAction<{ batchId: string; taskIds: string[]; totalTasks: number }>) => {
+				state.isBatchStarting = false;
 				state.startBatchError = null;
 				state.currentBatchId = action.payload.batchId;
-				state.isBatchStarted = true; // Mark batch as active now
+				state.isBatchStarted = true;
 				state.batchProgress = {
-					total: action.payload.totalTasks,
+					total: action.payload.totalTasks, // Use total from payload
 					processed: 0, success: 0, failed: 0,
 				};
-				// Initialize trackedTasks
+				// Initialize trackedTasks based on previewData and received taskIds
 				const initialTasks: { [taskId: string]: TrackedIssuanceTask } = {};
-				state.previewData.forEach((row, index) => {
-					const taskId = action.payload.taskIds[index];
+				// Use previewData from state which should still hold the data
+				state.previewData.forEach((row) => {
+					// Find the corresponding taskId (backend guarantees order or provides mapping?)
+					// Assuming order matches for now, or backend needs to return taskId mapped to row number/Roll No
+					// Let's refine taskId generation/mapping if needed. Using Roll No for now.
+					const taskId = action.payload.taskIds.find(id => id.endsWith(row['Roll No']));
+
 					if (taskId) {
 						initialTasks[taskId] = {
 							...row,
 							taskId: taskId,
-							batchId: action.payload.batchId, // Add batchId
+							batchId: action.payload.batchId,
 							status: 'queued',
 							message: 'Queued for processing',
 							lastUpdated: new Date().toISOString(),
 							hash: null, txHash: null, error: null, walletAddress: null,
 						};
+					} else {
+						console.warn(`Could not find matching taskId for Roll No: ${row['Roll No']} in startBatch response.`);
 					}
 				});
 				state.trackedTasks = initialTasks;
 			})
 			.addCase(startIssuanceBatch.rejected, (state, action) => {
-				state.isBatchStarting = false; // Clear starting flag
+				state.isBatchStarting = false;
 				state.startBatchError = action.payload as string ?? 'Failed to start batch.';
 				state.currentBatchId = null;
-				state.isBatchStarted = false; // Ensure not marked as started
+				state.isBatchStarted = false;
 			});
 	},
 });

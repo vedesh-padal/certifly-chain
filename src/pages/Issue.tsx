@@ -337,14 +337,15 @@ const Issue: React.FC = () => {
 		formData.append('recipientEmail', singleFormData.recipientEmail);
 		formData.append('certificateName', singleFormData.certificateName);
 
-		const resultAction = await dispatch(submitSingleIssue({ formData }));
+		// *** FIX: Wrap formData in an object ***
+		const resultAction = await dispatch(submitSingleIssue({ formData: formData }));
 
 		if (submitSingleIssue.rejected.match(resultAction)) {
 			toast({ title: 'Queueing Failed', description: resultAction.payload as string, variant: 'destructive' });
 		} else if (submitSingleIssue.fulfilled.match(resultAction)) {
 			toast({ title: 'Success', description: `Certificate queued (Task ID: ${resultAction.payload.taskId})` });
 			setSingleFileObject(null); // Reset local file state
-			dispatch(resetSingleIssueState());
+			// dispatch(resetSingleIssueState());
 		}
 	}, [isSingleFormComplete, singleFileObject, singleFormData, dispatch, toast]); // Added dispatch, singleFileObject, singleFormData
 
@@ -367,7 +368,8 @@ const Issue: React.FC = () => {
 		const formData = new FormData();
 		formData.append('csvFile', bulkCsvFileObject);
 
-		const resultAction = await dispatch(previewCsvFile(formData));
+		// *** FIX: Wrap formData in an object ***
+		const resultAction = await dispatch(previewCsvFile({ formData: formData }));
 
 		if (previewCsvFile.rejected.match(resultAction)) {
 			toast({ title: 'Preview Error', description: resultAction.payload as string, variant: 'destructive' });
