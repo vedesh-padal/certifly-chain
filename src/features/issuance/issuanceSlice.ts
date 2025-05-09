@@ -267,9 +267,29 @@ export const issuanceSlice = createSlice({
 			state.currentBatchId = null;
 			state.batchProgress = initialState.batchProgress;
 		},
-		// Reducer to handle WebSocket updates
+		// Reducer to handle WebSocket updates for BOTH single and bulk
 		updateTaskStatus: (state, action: PayloadAction<IssuanceStatusUpdatePayload>) => {
 			const { taskId, status, message, hash, txHash, error, timestamp, batchId, rowData } = action.payload;
+
+			// --- Update Single Issue State ---
+			// Check if the update is for the last submitted single task
+			if (state.singleLastTaskId === taskId) {
+				console.log(`Updating singleResponseState for taskId: ${taskId}`);
+				state.singleResponseState = {
+					// Update loading based on intermediate statuses
+					isLoading: status === 'processing' || status === 'queued' || status === 'waiting_wallet' || status === 'retry_queued',
+					isSuccess: status === 'success',
+					isError: status === 'failed',
+					// Construct a comprehensive message
+					message: `${message}${txHash ? ` (Tx: ${txHash.substring(0, 10)}...)` : ''}${error ? ` Error: ${error}` : ''}`
+				};
+				// Optionally clear singleLastTaskId if it reaches a final state?
+				// if (status === 'success' || status === 'failed') {
+				//     state.singleLastTaskId = null; // Or keep it to show last status
+				// }
+			}
+
+			// --- Update Bulk Tracked Task State ---
 			if (state.trackedTasks[taskId]) {
 				const taskBeforeUpdate = state.trackedTasks[taskId];
 				const wasAlreadyProcessed = taskBeforeUpdate.status === 'success' || taskBeforeUpdate.status === 'failed';
