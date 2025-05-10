@@ -77,19 +77,24 @@ const renderStatusBadge = (taskData: TrackedIssuanceTask) => {
 	if (errorDetails) tooltipContent += ` | Error: ${errorDetails}`;
 
 	return (
-		<TooltipProvider delayDuration={100}>
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<Badge variant={badgeVariant} className={badgeClass}>
-						{IconComponent && <IconComponent className="h-3 w-3 mr-1 flex-shrink-0" />}
-						<span className="truncate">{statusText}</span>
-					</Badge>
-				</TooltipTrigger>
-				<TooltipContent className="max-w-xs text-center" side="top">
-					<p>{tooltipContent}</p>
-				</TooltipContent>
-			</Tooltip>
-		</TooltipProvider>
+		<Tooltip> {/* Assuming TooltipProvider is higher up */}
+			<TooltipTrigger asChild>
+				<Badge variant={badgeVariant} className={badgeClass}>
+					{IconComponent && <IconComponent className="h-3 w-3 mr-1 flex-shrink-0" />}
+					<span className="truncate">{statusText}</span>
+				</Badge>
+			</TooltipTrigger>
+			<TooltipContent
+				className="max-w-xs text-center z-50" // Add z-index just in case
+				side="bottom"
+				align="center"
+				sideOffset={5}
+				collisionPadding={25} // Increase padding
+				sticky="always" // Try 'partial' or 'always'
+			>
+				<p>{tooltipContent}</p>
+			</TooltipContent>
+		</Tooltip>
 	);
 };
 
