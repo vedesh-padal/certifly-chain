@@ -19,6 +19,9 @@ import Issue from "./pages/Issue";
 import Verify from "./pages/Verify";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import LandingPage from "./pages/LandingPage";
+import TechnicalDetails from "./pages/TechnicalDetails";
+import AboutUs from "./pages/AboutUs";
 
 
 // Inner component to allow using dispatch hook
@@ -56,7 +59,7 @@ const AppContent = () => {
 		<QueryClientProvider client={queryClient}>
 			<ThemeProvider>
 				{/* No AuthProvider needed */}
-				<TooltipProvider>
+				<TooltipProvider delayDuration={100}>
 					<Toaster />
 					<Sonner />
 					<BrowserRouter>
@@ -66,7 +69,9 @@ const AppContent = () => {
 							<Route path="/issue" element={<Issue />} />
 							<Route path="/verify" element={<Verify />} />
 							<Route path="/settings" element={<Settings />} />
-							<Route path="/" element={<Login />} /> {/* Redirect root to login */}
+							<Route path="/technical-details" element={<TechnicalDetails />} />
+							<Route path="/about-us" element={<AboutUs />} />
+							<Route path="/" element={<LandingPage />} />
 							<Route path="*" element={<NotFound />} />
 						</Routes>
 					</BrowserRouter>
