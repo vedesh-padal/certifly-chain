@@ -15,9 +15,10 @@ import {
   ShieldCheck, 
   DatabaseZap, 
   ScanLine, 
-  Sheet, 
+  Sheet as SheetIcon, 
   Wifi, 
   Users,
+  Menu,
   ChevronDown
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
