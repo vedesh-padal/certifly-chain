@@ -4,8 +4,7 @@ import axios, { AxiosError } from 'axios';
 import type { RootState } from '../../app/store';
 import { FileInfo } from '../../types'; // Import FileInfo type
 
-// Define API Base URL
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
 // Define the shape of the verification result from the backend
 interface VerificationResult {

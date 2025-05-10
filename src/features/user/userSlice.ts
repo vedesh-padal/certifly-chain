@@ -6,8 +6,7 @@ import { User } from '../../types'; // Import User type if needed for payload
 // Import auth action to update user data globally after profile update
 import { loginUser } from '../auth/authSlice'; // We can reuse loginUser.fulfilled logic
 
-// Define API Base URL (Consider centralizing this later)
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
 interface UserSettingsState {
 	// Loading states for specific actions

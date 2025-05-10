@@ -35,7 +35,7 @@ const initialState: AuthState = {
 };
 
 // Define API Base URL
-const API_BASE_URL = 'http://localhost:3001/api'; // Move to config later
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
 // --- Async Thunks using Axios ---
 
