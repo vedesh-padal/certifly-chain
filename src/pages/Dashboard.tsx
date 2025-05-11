@@ -135,6 +135,7 @@ const Dashboard: React.FC = () => {
 		console.log("Dashboard: handleSearchSubmit dispatching fetch with query:", searchInput);
 		dispatch(fetchIssuedCertificates({ query: searchInput, page: 1 }));
 	}, [dispatch, searchInput]);
+
 	const handleRefresh = () => {
 		if (currentUser?.role === 'issuer') {
 			dispatch(fetchIssuedCertificates({ page: currentPage }));
