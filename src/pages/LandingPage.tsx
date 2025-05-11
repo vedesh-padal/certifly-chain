@@ -17,8 +17,8 @@ import {
 	ScanLine,
 	Wifi,
 	Users,
-	// ChevronDown,
-	Menu
+	Menu,
+	Lock
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui-custom/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -236,14 +236,199 @@ const LandingPage: React.FC = () => {
 					</div>
 				</section>
 
-				{/* Solution Section */}
-				<section className="py-16 md:py-20 px-4 bg-background">
-					{/* ... (Content seems okay, ensure responsive layout for text and image) ... */}
+				{/* Solution Section ("Introducing CertiChain") */}
+				<section className="py-16 md:py-20 px-4 bg-background dark:bg-background">
+					<div className="container mx-auto">
+						<div className="text-center mb-12 md:mb-16">
+							<h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+								CertiChain: The Smart Solution
+							</h2>
+							<p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+								CertiChain leverages the power of blockchain technology and AI to create a secure, transparent, and efficient ecosystem for digital certificates, addressing the limitations of traditional methods.
+							</p>
+						</div>
+
+						<div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+							{/* Left Column: Benefit Points */}
+							<div className="space-y-8">
+								<div className="flex items-start gap-4">
+									<div className="flex-shrink-0 bg-primary/10 p-3 rounded-lg mt-1">
+										<Lock className="h-6 w-6 text-primary" /> {/* Changed Icon */}
+									</div>
+									<div>
+										<h3 className="font-semibold text-xl mb-1">Immutable Security</h3>
+										<p className="text-muted-foreground text-sm">
+											By anchoring certificate hashes on the blockchain, CertiChain ensures that once a certificate is issued, its record is tamper-proof and permanently verifiable.
+										</p>
+									</div>
+								</div>
+
+								<div className="flex items-start gap-4">
+									<div className="flex-shrink-0 bg-primary/10 p-3 rounded-lg mt-1">
+										<ShieldCheck className="h-6 w-6 text-primary" /> {/* Changed Icon */}
+									</div>
+									<div>
+										<h3 className="font-semibold text-xl mb-1">Instant Authenticity</h3>
+										<p className="text-muted-foreground text-sm">
+											Verifiers can instantly check a certificate's legitimacy against the blockchain ledger, eliminating doubt and significantly reducing verification times.
+										</p>
+									</div>
+								</div>
+
+								<div className="flex items-start gap-4">
+									<div className="flex-shrink-0 bg-primary/10 p-3 rounded-lg mt-1">
+										<Cpu className="h-6 w-6 text-primary" /> {/* Changed Icon */}
+									</div>
+									<div>
+										<h3 className="font-semibold text-xl mb-1">AI-Powered Verification</h3>
+										<p className="text-muted-foreground text-sm">
+											Our system uses advanced OCR (Optical Character Recognition) via Google Cloud Document AI to extract data from uploaded certificates, enabling verification even from scanned documents.
+										</p>
+									</div>
+								</div>
+
+								<div className="flex items-start gap-4">
+									<div className="flex-shrink-0 bg-primary/10 p-3 rounded-lg mt-1">
+										<Layers className="h-6 w-6 text-primary" /> {/* Changed Icon */}
+									</div>
+									<div>
+										<h3 className="font-semibold text-xl mb-1">Streamlined Issuance</h3>
+										<p className="text-muted-foreground text-sm">
+											Institutions can issue individual certificates or process them in bulk via CSV uploads, with real-time tracking of the asynchronous issuance process.
+										</p>
+									</div>
+								</div>
+							</div>
+
+							{/* Right Column: Illustrative Graphic Placeholder */}
+							<div className="hidden lg:flex items-center justify-center">
+								<div className="relative h-[350px] w-[350px] xl:h-[400px] xl:w-[400px] rounded-full overflow-hidden shadow-2xl border-4 border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-accent/10 dark:from-primary/10 dark:via-transparent dark:to-accent/5">
+									{/* Placeholder for a more sophisticated graphic */}
+									<Shield className="absolute inset-0 m-auto h-32 w-32 text-primary opacity-30 animate-pulse-slow" />
+									<Fingerprint className="absolute top-1/4 left-1/4 h-16 w-16 text-primary/70 opacity-20 transform -rotate-12" />
+									<ScanLine className="absolute bottom-1/4 right-1/4 h-16 w-16 text-primary/70 opacity-20 transform rotate-12" />
+									{/* You can replace this with an actual SVG or image */}
+									<div className="absolute inset-0 bg-card/10 dark:bg-card/5 backdrop-blur-xs"></div>
+								</div>
+							</div>
+						</div>
+					</div>
 				</section>
 
 				{/* How It Works Section */}
-				<section ref={howItWorksRef} className="py-16 md:py-20 px-4 bg-muted/50 dark:bg-muted/10">
-					{/* ... (Content seems okay, ensure cards are styled well) ... */}
+				<section ref={howItWorksRef} className="py-16 md:py-20 px-4 bg-muted/20 dark:bg-muted/10">
+					<div className="container mx-auto">
+						<div className="text-center mb-12 md:mb-16">
+							<h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+								Simple, Secure, Seamless
+							</h2>
+							<p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+								Our platform streamlines the entire certificate lifecycle with intuitive workflows for both issuers and verifiers.
+							</p>
+						</div>
+
+						<div className="space-y-16">
+							{/* Issuer Flow */}
+							<div>
+								<h3 className="text-2xl font-semibold mb-8 text-center">
+									For <span className="text-primary">Issuers</span>
+								</h3>
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+									<Card className="bg-card text-center hover:shadow-xl transition-shadow duration-300">
+										<CardHeader>
+											<div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+												<FileUp className="h-8 w-8 text-primary" />
+											</div>
+											<CardTitle className="text-xl">1. Upload</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<p className="text-sm text-muted-foreground">
+												Easily upload certificate data individually or in large batches using our simple CSV template.
+											</p>
+										</CardContent>
+									</Card>
+
+									<Card className="bg-card text-center hover:shadow-xl transition-shadow duration-300">
+										<CardHeader>
+											<div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+												<Fingerprint className="h-8 w-8 text-primary" />
+											</div>
+											<CardTitle className="text-xl">2. Secure & Process</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<p className="text-sm text-muted-foreground">
+												CertiChain automatically hashes content and queues it for secure recording on the blockchain.
+											</p>
+										</CardContent>
+									</Card>
+
+									<Card className="bg-card text-center hover:shadow-xl transition-shadow duration-300">
+										<CardHeader>
+											<div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+												<Bell className="h-8 w-8 text-primary" />
+											</div>
+											<CardTitle className="text-xl">3. Track & Notify</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<p className="text-sm text-muted-foreground">
+												Monitor real-time issuance status via WebSockets. Recipients are informed upon completion.
+											</p>
+										</CardContent>
+									</Card>
+								</div>
+							</div>
+
+							{/* Verifier Flow */}
+							<div>
+								<h3 className="text-2xl font-semibold mb-8 text-center">
+									For <span className="text-primary">Verifiers</span>
+								</h3>
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+									<Card className="bg-card text-center hover:shadow-xl transition-shadow duration-300">
+										<CardHeader>
+											<div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+												<FileSearch className="h-8 w-8 text-primary" />
+											</div>
+											<CardTitle className="text-xl">1. Upload</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<p className="text-sm text-muted-foreground">
+												Simply upload or drag-and-drop the certificate file (PDF, JPG, PNG) for verification.
+											</p>
+										</CardContent>
+									</Card>
+
+									<Card className="bg-card text-center hover:shadow-xl transition-shadow duration-300">
+										<CardHeader>
+											<div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+												<Cpu className="h-8 w-8 text-primary" />
+											</div>
+											<CardTitle className="text-xl">2. Analyze</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<p className="text-sm text-muted-foreground">
+												Our AI-powered OCR extracts text, and the system calculates its unique cryptographic hash.
+											</p>
+										</CardContent>
+									</Card>
+
+									<Card className="bg-card text-center hover:shadow-xl transition-shadow duration-300">
+										<CardHeader>
+											<div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+												<ShieldCheck className="h-8 w-8 text-primary" />
+											</div>
+											<CardTitle className="text-xl">3. Verify</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<p className="text-sm text-muted-foreground">
+												Instantly confirm the certificate's authenticity against immutable records on the blockchain.
+											</p>
+										</CardContent>
+									</Card>
+								</div>
+							</div>
+						</div>
+					</div>
 				</section>
 
 				{/* Key Features Section */}
