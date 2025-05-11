@@ -1,9 +1,10 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { CertificateCard } from '@/components/ui-custom/CertificateCard';
 import { Certificate } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { FileCheck, Shield, Upload, Search, Scan, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 // --- Import Shadcn Pagination Components ---
@@ -29,7 +30,9 @@ import {
 	selectDashboardError,
 	selectDashboardPagination,
 	clearDashboardError, // Action to clear error
-	resetDashboardState // Action to reset on logout/role change
+	resetDashboardState, // Action to reset on logout/role change
+	selectSearchQuery,
+	setSearchQuery
 } from '@/features/dashboard/dashboardSlice';
 // --- End Redux Imports ---
 
@@ -46,17 +49,25 @@ const Dashboard: React.FC = () => {
 	const isLoading = useSelector(selectDashboardIsLoading); // Dashboard specific loading
 	const dashboardError = useSelector(selectDashboardError);
 	const { currentPage, totalPages, totalCount } = useSelector(selectDashboardPagination); // Destructure
+	const currentSearchQuery = useSelector(selectSearchQuery); // Get search query from Redux
 	// --- End Redux State ---
+
+	// --- Local state for the search input field ---
+	const [searchInput, setSearchInput] = useState('');
+
+	// --- Effect to sync local search input with Redux state (e.g., on load/clear) ---
+	useEffect(() => {
+		setSearchInput(currentSearchQuery);
+	}, [currentSearchQuery]);
+
 
 	// --- Effect to fetch certificates for issuers ---
 	useEffect(() => {
 		if (currentUser?.role === 'issuer') {
-			console.log("Dashboard: Issuer detected, fetching issued certificates.");
-			// Pass current page from pagination state if implementing pagination UI
-			dispatch(fetchIssuedCertificates({ page: currentPage }));
+			// Fetch will use currentSearchQuery from Redux state
+			dispatch(fetchIssuedCertificates({ page: currentPage /*, query: currentSearchQuery */ }));
+			// The thunk now reads searchQuery from state if args.query is undefined
 		} else {
-			// If user is not an issuer or no user, reset dashboard state
-			// This handles role changes or logout cleanly
 			dispatch(resetDashboardState());
 		}
 
@@ -65,7 +76,7 @@ const Dashboard: React.FC = () => {
 		// return () => {
 		// 	dispatch(resetDashboardState());
 		// };
-	}, [dispatch, currentUser?.id, currentUser?.role, currentPage]); // Re-fetch if user or page changes
+	}, [dispatch, currentUser?.id, currentUser?.role, currentPage]); // Removed currentSearchQuery, thunk reads it
 
 	// --- Effect to show error toasts for dashboard data fetching ---
 	useEffect(() => {
@@ -103,6 +114,27 @@ const Dashboard: React.FC = () => {
 		}
 	};
 
+	// --- Effect to fetch certificates (primarily for initial load and page changes) ---
+	useEffect(() => {
+		if (currentUser?.role === 'issuer') {
+			// This effect now primarily handles initial load and pagination clicks
+			// It will also run if currentSearchQuery changes due to external factors, which is fine.
+			console.log("Dashboard: useEffect fetching. Page:", currentPage, "Query:", currentSearchQuery);
+			dispatch(fetchIssuedCertificates({ page: currentPage, query: currentSearchQuery }));
+		} else {
+			dispatch(resetDashboardState());
+		}
+	}, [dispatch, currentUser?.id, currentUser?.role, currentPage, currentSearchQuery]); // Keep currentSearchQuery here too
+
+	const handleSearchSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
+		e?.preventDefault();
+		// First, update the searchQuery in Redux state and reset page to 1
+		dispatch(setSearchQuery(searchInput));
+		// Then, explicitly dispatch the fetch with the new search query
+		// Note: setSearchQuery already resets currentPage to 1 in the reducer.
+		console.log("Dashboard: handleSearchSubmit dispatching fetch with query:", searchInput);
+		dispatch(fetchIssuedCertificates({ query: searchInput, page: 1 }));
+	}, [dispatch, searchInput]);
 	const handleRefresh = () => {
 		if (currentUser?.role === 'issuer') {
 			dispatch(fetchIssuedCertificates({ page: currentPage }));
@@ -136,22 +168,7 @@ const Dashboard: React.FC = () => {
 	// 	);
 	// }
 
-
-	if (!currentUser && !isLoading) { // If still no user after initial loading from authSlice
-		console.log("Dashboard: currentUser is null and not loading auth, redirecting (should be handled by Layout).");
-		// DashboardLayout should handle the redirect. This is a fallback.
-		// To prevent rendering anything, you could return null or a minimal loader.
-		return null;
-	}
-	if (!currentUser && isLoading) { // If auth is still loading
-		return (
-			<DashboardLayout>
-				<div>Loading user session...</div>
-			</DashboardLayout>
-		)
-	}
-
-	// --- NEW: Function to render pagination items (helper for complex logic) ---
+	// --- Function to render pagination items (helper for complex logic) ---
 	const renderPaginationItems = () => {
 		if (!totalPages || totalPages <= 1) return null;
 
@@ -244,6 +261,21 @@ const Dashboard: React.FC = () => {
 	};
 
 
+	if (!currentUser && !isLoading) { // If still no user after initial loading from authSlice
+		console.log("Dashboard: currentUser is null and not loading auth, redirecting (should be handled by Layout).");
+		// DashboardLayout should handle the redirect. This is a fallback.
+		// To prevent rendering anything, you could return null or a minimal loader.
+		return null;
+	}
+	if (!currentUser && isLoading) { // If auth is still loading
+		return (
+			<DashboardLayout>
+				<div>Loading user session...</div>
+			</DashboardLayout>
+		)
+	}
+
+
 	return (
 		<DashboardLayout>
 			<div className="flex flex-col gap-8">
@@ -274,17 +306,27 @@ const Dashboard: React.FC = () => {
 					<div className="glass-card p-6 rounded-lg">
 						<div className="flex items-center justify-between mb-6">
 							<h2 className="text-xl font-semibold">Recent Certificates Issued</h2>
-							<div className="flex items-center gap-2">
-								<Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isLoading} className="flex items-center gap-1">
-									<RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+
+							{/* --- Search Form --- */}
+							<form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full sm:w-auto">
+								<Input
+									type="search"
+									placeholder="Search by name, email, cert, hash..."
+									value={searchInput}
+									onChange={(e) => setSearchInput(e.target.value)}
+									className="h-9 w-full sm:w-64"
+								/>
+								<Button type="submit" variant="ghost" size="icon" className="h-9 w-9" disabled={isLoading}>
+									<Search className="h-4 w-4" />
+								</Button>
+								<Button type="button" variant="ghost" size="sm" onClick={handleRefresh} disabled={isLoading} className="flex items-center gap-1 h-9">
+									<RefreshCw className={`h-4 w-4 ${isLoading && currentSearchQuery === searchInput ? 'animate-spin' : ''}`} />
 									<span className="hidden sm:inline">Refresh</span>
 								</Button>
-								{/* Search button - functionality deferred */}
-								<Button variant="ghost" size="sm" className="flex items-center gap-1">
-									<Search className="h-4 w-4" />
-									<span className="hidden sm:inline">Search</span>
-								</Button>
-							</div>
+							</form>
+							{/* --- End Search Form --- */}
+
+							{/* removed placeholder refresh, search previous */}
 						</div>
 
 						{isLoading && issuedCertificates.length === 0 ? ( // Show loading only if no data yet
@@ -306,26 +348,35 @@ const Dashboard: React.FC = () => {
 								{getActionButton()}
 							</div>
 						) : (
-							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-								{issuedCertificates.map((cert: CertificateMetadataFromDB) => {
-									const cardProps = {
-										id: cert._id || cert.id || cert.hash,
-										name: cert.certificateName,
-										recipientName: cert.recipientName,
-										recipientEmail: cert.recipientEmail,
-										issuerId: cert.issuerId,
-										issuerName: cert.issuerName,
-										issueDate: new Date(cert.issueDate).toLocaleDateString(),
-										hash: cert.hash,
-										verified: cert.status === 'issued'
-									};
-									return <CertificateCard key={cardProps.id} certificate={cardProps} />;
-								})}
+							// --- SCROLLABLE GRID OF RECENT ISSUED CERTIFICATES ---
+							<div
+								className="overflow-y-auto pr-2 custom-scrollbar" // Allow vertical scrolling, padding for scrollbar
+								// Set a max-height. Adjust this value to show ~1.5 rows initially.
+								// The exact value depends on your CertificateCard's height and gap.
+								// Example: If a card + gap is ~200px, 1.5 rows is ~300px.
+								// For a more dynamic approach, you might need JS, but fixed height is simpler.
+								style={{ maxHeight: 'calc(20rem + 4rem)' }} // Approx height for 1.5 rows of cards + some gap
+							// Example for a fixed pixel height: style={{ maxHeight: '550px' }}
+							>
+								<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+									{issuedCertificates.map((cert: CertificateMetadataFromDB) => {
+										const cardProps: Certificate = {
+											id: cert._id || cert.id || cert.hash,
+											name: cert.certificateName,
+											recipientName: cert.recipientName,
+											recipientEmail: cert.recipientEmail,
+											issuerId: cert.issuerId,
+											issuerName: cert.issuerName,
+											issueDate: new Date(cert.issueDate).toLocaleDateString(),
+											hash: cert.hash,
+											verified: cert.status === 'issued'
+										};
+										return <CertificateCard key={cardProps.id} certificate={cardProps} />;
+									})}
+								</div>
 							</div>
+							// --- END MODIFICATION ---
 						)}
-
-						{/* --- NEW: Pagination Controls --- */}
-						{/* If you have more than 9 certificates, you should see the pagination controls appear below the grid. */}
 						{totalPages > 1 && (
 							<Pagination className="mt-8">
 								<PaginationContent>

@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction, createAsyncThunk, createSelector } from '@reduxjs/toolkit';
 import axios, { AxiosError } from 'axios'; // Use global axios
 import type { RootState } from '../../app/store';
 import { Certificate as CertificateCardPropType } from '../../types';
@@ -42,12 +42,14 @@ interface DashboardState {
 	currentPage: number;
 	totalPages: number;
 	totalCount: number;
+	searchQuery: string;
 }
 
 // Define an interface for the thunk argument
 interface FetchCertificatesArgs {
 	page?: number;
 	limit?: number;
+	query?: string;
 }
 
 const initialState: DashboardState = {
@@ -57,6 +59,7 @@ const initialState: DashboardState = {
 	currentPage: 1,
 	totalPages: 1,
 	totalCount: 0,
+	searchQuery: '', //	Initialize search query
 };
 
 // --- Helper to get token (if not using interceptor) ---
@@ -69,21 +72,33 @@ export const fetchIssuedCertificates = createAsyncThunk(
 	'dashboard/fetchIssued',
 	async (args: FetchCertificatesArgs | undefined, { getState, rejectWithValue }) => {
 		const token = getToken(getState as () => RootState);
-		if (!token) {
-			return rejectWithValue('Not authenticated');
-		}
+		if (!token) return rejectWithValue('Not authenticated');
 
-		// Use defaults if args or its properties are not provided
-		const params = {
+		const state = getState() as RootState; // Get current state
+		const queryToUse = args?.query !== undefined ? args.query : state.dashboard.searchQuery; // Use passed query or state query
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const params: any = { // Use 'any' for params object for flexibility
 			page: args?.page || 1,
 			limit: args?.limit || 9,
 		};
+		if (queryToUse.trim() !== '') {
+			params.query = queryToUse.trim(); // Add query param only if not empty
+		}
+
 
 		try {
 			console.log('Thunk: fetchIssuedCertificates executing with params:', params);
 			// Use global axios, API_BASE_URL, and manually add headers
+
+			// API endpoint is now /api/certificates/search if query is present,
+			// or /api/certificates/issued-by-me if query is empty.
+			// Our backend /search endpoint handles empty query by returning all, so we can always use /search.
+			const endpoint = `/certificates/search`; // Always use search endpoint
+
+
 			const response = await axios.get<IssuedCertificatesResponse>(
-				`${API_BASE_URL}/certificates/issued-by-me`,
+				`${API_BASE_URL}${endpoint}`,
 				{
 					params, // Send pagination as query parameters
 					headers: {
@@ -105,19 +120,20 @@ export const fetchIssuedCertificates = createAsyncThunk(
 		}
 	}
 );
+
 // --- Dashboard Slice Definition ---
 export const dashboardSlice = createSlice({
 	name: 'dashboard',
 	initialState,
 	reducers: {
+		setSearchQuery: (state, action: PayloadAction<string>) => {
+			state.searchQuery = action.payload;
+			state.currentPage = 1; // Reset to first page on new search
+		},
 		// Action to clear dashboard state, e.g., on logout
 		resetDashboardState: (state) => {
-			state.issuedCertificates = [];
-			state.isLoading = false;
-			state.error = null;
-			state.currentPage = 1;
-			state.totalPages = 1;
-			state.totalCount = 0;
+			// Keep initialState reference for resetting
+			Object.assign(state, initialState);
 		},
 		clearDashboardError: (state) => {
 			state.error = null;
@@ -125,9 +141,14 @@ export const dashboardSlice = createSlice({
 	},
 	extraReducers: (builder) => {
 		builder
-			.addCase(fetchIssuedCertificates.pending, (state) => {
+			.addCase(fetchIssuedCertificates.pending, (state, action) => {
 				state.isLoading = true;
 				state.error = null;
+				// If a new search query is part of the meta args, update it
+				if (action.meta.arg?.query !== undefined) {
+					state.searchQuery = action.meta.arg.query;
+					state.currentPage = 1; // Reset page for new search
+				}
 			})
 			.addCase(fetchIssuedCertificates.fulfilled, (state, action: PayloadAction<IssuedCertificatesResponse>) => {
 				state.isLoading = false;
@@ -135,29 +156,41 @@ export const dashboardSlice = createSlice({
 				state.currentPage = action.payload.currentPage;
 				state.totalPages = action.payload.totalPages;
 				state.totalCount = action.payload.totalCount;
+				// Update searchQuery if needed based on what was used in the thunk
+				// No need to expect fetchedWithQuery in payload
 				state.error = null;
 			})
 			.addCase(fetchIssuedCertificates.rejected, (state, action) => {
 				state.isLoading = false;
 				state.error = action.payload as string;
-				state.issuedCertificates = []; // Clear data on error
+				// Don't clear certificates on error if just a search/pagination failed,
+				// user might want to see previous results. Clear if it's an initial load error.
+				// state.issuedCertificates = [];
 			});
 	},
 });
 
 // Export actions
-export const { resetDashboardState, clearDashboardError } = dashboardSlice.actions;
+export const { setSearchQuery, resetDashboardState, clearDashboardError } = dashboardSlice.actions;
 
 // Export selectors
 export const selectDashboardState = (state: RootState) => state.dashboard;
 export const selectIssuedCertificates = (state: RootState) => state.dashboard.issuedCertificates;
 export const selectDashboardIsLoading = (state: RootState) => state.dashboard.isLoading;
 export const selectDashboardError = (state: RootState) => state.dashboard.error;
-export const selectDashboardPagination = (state: RootState) => ({
-	currentPage: state.dashboard.currentPage,
-	totalPages: state.dashboard.totalPages,
-	totalCount: state.dashboard.totalCount,
-});
 
-// Export reducer
+// Use createSelector for memoized selectors to avoid unnecessary re-renders
+export const selectDashboardPagination = createSelector(
+	[(state: RootState) => state.dashboard.currentPage,
+	(state: RootState) => state.dashboard.totalPages,
+	(state: RootState) => state.dashboard.totalCount],
+	(currentPage, totalPages, totalCount) => ({
+		currentPage,
+		totalPages,
+		totalCount
+	})
+);
+
+export const selectSearchQuery = (state: RootState) => state.dashboard.searchQuery;
+
 export default dashboardSlice.reducer;
