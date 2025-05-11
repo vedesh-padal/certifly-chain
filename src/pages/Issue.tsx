@@ -542,4 +542,4 @@ const Issue: React.FC = () => {
 	);
 };
 
-export default Issue;
+export default IssueCertificate;
