@@ -22,6 +22,7 @@ import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
 import TechnicalDetails from "./pages/TechnicalDetails";
 import AboutUs from "./pages/AboutUs";
+import PublicVerifyPage from "./pages/PublicVerify";
 
 
 // Inner component to allow using dispatch hook
@@ -72,6 +73,7 @@ const AppContent = () => {
 							<Route path="/technical-details" element={<TechnicalDetails />} />
 							<Route path="/about-us" element={<AboutUs />} />
 							<Route path="/" element={<LandingPage />} />
+							<Route path="/verify-public" element={<PublicVerifyPage />} />
 							<Route path="*" element={<NotFound />} />
 						</Routes>
 					</BrowserRouter>

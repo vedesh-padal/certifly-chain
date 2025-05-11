@@ -10,6 +10,8 @@ import { ThemeToggle } from '@/components/ui-custom/ThemeToggle'; // Assuming yo
 const TechnicalDetails: React.FC = () => {
 	const currentYear = new Date().getFullYear();
 
+	const PROJECT_FLOW_DIAGRAM_LINK = import.meta.env.VITE_PROJECT_FLOW_DIAGRAM_LINK || "https://tinyurl.com/36cake8f";
+
 	const techItems = [
 		{
 			icon: <Layers className="h-8 w-8 text-primary mb-3" />,
@@ -101,7 +103,7 @@ const TechnicalDetails: React.FC = () => {
 							<Dialog>
 								<DialogTrigger asChild>
 									<img
-										src="https://shorturl.at/UiS6U"
+										src={PROJECT_FLOW_DIAGRAM_LINK}
 										alt="System Architecture Diagram"
 										className="w-full h-auto object-contain rounded-md shadow-md transition-transform duration-300 hover:scale-105"
 										style={{ maxHeight: '600px' }} // Adjust max height as needed
@@ -109,7 +111,7 @@ const TechnicalDetails: React.FC = () => {
 								</DialogTrigger>
 								<DialogContent className="max-w-none max-h-screen flex items-center justify-center p-6">
 									<img
-										src="https://shorturl.at/UiS6U"
+										src={PROJECT_FLOW_DIAGRAM_LINK}
 										alt="Enlarged System Architecture Diagram"
 										className="max-h-screen max-w-screen object-contain"
 									/>
