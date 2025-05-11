@@ -3,6 +3,7 @@ import issuanceReducer from '../features/issuance/issuanceSlice';
 import authReducer from '../features/auth/authSlice';
 import userSettingsReducer from '../features/user/userSlice';
 import verificationReducer from '../features/verification/verificationSlice';
+import dashboardReducer from '../features/dashboard/dashboardSlice';
 
 export const store = configureStore({
 	reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
 		auth: authReducer,
 		userSettings: userSettingsReducer,
 		verification: verificationReducer,
+		dashboard: dashboardReducer,
 	},
 	devTools: process.env.NODE_ENV !== 'production',
 });

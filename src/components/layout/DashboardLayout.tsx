@@ -43,6 +43,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 	// --- Loading State ---
 	// Show loading ONLY during the initial load phase managed by Redux
 	if (isLoading) {
+		console.log("DashboardLayout: Auth state is loading...");
 		return (
 			<div className="flex h-screen w-full items-center justify-center bg-background dark:bg-background">
 				<div className="flex flex-col items-center gap-4">
@@ -68,6 +69,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 		// User doesn't have the required role, redirect to general dashboard
 		return <Navigate to="/dashboard" replace />;
 	}
+
+	console.log("DashboardLayout: Rendering protected content for user:", user.username);
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background dark:bg-background">
