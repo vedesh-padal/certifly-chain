@@ -5,13 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUp, Sheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileUp, Sheet } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-
 // --- Redux Imports ---
 import { useSelector, useDispatch } from 'react-redux';
-import { AppDispatch, RootState } from '@/app/store'; // Import types from store
+import { AppDispatch } from '@/app/store'; // Import types from store
 import {
 	// Import Actions
 	setSingleFile,
@@ -43,55 +39,6 @@ import { BulkGuideCard } from '@/components/issue/BulkGuideCard';
 // Import Types
 import { TrackedIssuanceTask, IssuanceStatusUpdatePayload, IssuanceState } from '@/types'; // Keep necessary types
 import { ResponseBox } from '@/components/ui-custom/ResponseBox';
-
-// --- Mock WebSocket Hook (Keep for now, will connect to Redux later) ---
-// const useMockWebSocket = (
-// 	isBatchStarted: boolean,
-// 	batchId: string | null,
-// 	initialPreviewDataLength: number, // Need length to simulate correct number
-// 	dispatch: AppDispatch // Pass dispatch to the hook
-// ) => {
-// 	useEffect(() => {
-// 		if (!isBatchStarted || !batchId || initialPreviewDataLength === 0) return;
-
-// 		console.log("Setting up MOCK WebSocket listeners for batch:", batchId);
-// 		const timeouts: NodeJS.Timeout[] = [];
-
-// 		// Simulate receiving updates for each task based on length
-// 		for (let i = 0; i < initialPreviewDataLength; i++) {
-// 			const mockRollNo = `R${1000 + i}`; // Reconstruct Roll No assumption
-// 			const taskId = `task_${batchId}_${mockRollNo}`; // Reconstruct taskId
-// 			const delay = (i + 1) * 1500 + Math.random() * 1000;
-
-// 			timeouts.push(setTimeout(() => {
-// 				const isSuccess = Math.random() > 0.2;
-// 				const updatePayload: IssuanceStatusUpdatePayload = {
-// 					taskId: taskId,
-// 					batchId: batchId,
-// 					status: isSuccess ? 'success' : 'failed',
-// 					message: isSuccess ? 'Mock: Issued successfully' : 'Mock: Failed transaction',
-// 					rowData: { 'Roll No': mockRollNo, 'Recipient Name': `Mock Student ${i + 1}` },
-// 					timestamp: new Date().toISOString(),
-// 					txHash: isSuccess ? `0x${Math.random().toString(16).substring(2, 12)}` : undefined,
-// 					hash: isSuccess ? `0x${Math.random().toString(16).substring(2, 66)}` : undefined,
-// 					error: isSuccess ? undefined : 'Mock transaction rejected',
-// 					walletAddress: isSuccess ? `0xWallet${i % 2}` : undefined,
-// 				};
-// 				console.log("Simulating WS message:", updatePayload);
-// 				// Dispatch action to update Redux state
-// 				dispatch(updateTaskStatus(updatePayload));
-// 			}, delay));
-// 		}
-
-// 		return () => {
-// 			console.log("Cleaning up MOCK WebSocket listeners for batch:", batchId);
-// 			timeouts.forEach(clearTimeout);
-// 		};
-// 		// Depend on length instead of the full data array
-// 	}, [isBatchStarted, batchId, initialPreviewDataLength, dispatch]);
-// };
-// --- End Mock WebSocket Hook ---
-
 
 const Issue: React.FC = () => {
 	const { toast } = useToast();
@@ -145,170 +92,6 @@ const Issue: React.FC = () => {
 
 
 	// --- Handlers Dispatching Redux Actions ---
-
-	// // Single Issuance Handlers
-	// const handleSingleFileSelect = useCallback((selectedFile: File | null) => {
-	// 	dispatch(setSingleFile(selectedFile));
-	// 	// Optional: Auto-populate name based on file (can be done via another action/logic if needed)
-	// 	if (selectedFile) {
-	// 		if (selectedFile.name.includes('degree')) dispatch(setSingleFormData({ field: 'certificateName', value: 'Bachelor of Science' }));
-	// 		else if (selectedFile.name.includes('diploma')) dispatch(setSingleFormData({ field: 'certificateName', value: 'Diploma' }));
-	// 		else dispatch(setSingleFormData({ field: 'certificateName', value: 'Certificate' }));
-	// 	} else {
-	// 		dispatch(setSingleFormData({ field: 'certificateName', value: '' }));
-	// 	}
-	// }, [dispatch]);
-
-	// const handleSingleFormChange = useCallback((field: keyof IssuanceState['singleFormData'], value: string) => {
-	// 	dispatch(setSingleFormData({ field, value }));
-	// }, [dispatch]);
-
-
-
-
-	// const handleSingleSubmit = useCallback(async (e: React.FormEvent) => {
-	// 	e.preventDefault();
-	// 	if (!isSingleFormComplete || !singleFile) return; // Check file info exists in state
-
-	// 	// Create FormData for the API call (actual File object is not in Redux)
-	// 	// We need access to the original File object, which we removed from Redux state.
-	// 	// SOLUTION: Keep the actual File object in local component state temporarily,
-	// 	// only store FileInfo in Redux. Or, pass the File object directly to the thunk.
-	// 	// Let's modify the thunk to accept the File object directly for simplicity now.
-
-	// 	const formData = new FormData();
-	// 	// Retrieve the actual File object - Requires keeping it in local state *in addition* to Redux FileInfo
-	// 	// ** This highlights a limitation/choice point: Keep File locally or handle upload differently **
-	// 	// For now, let's assume we *do* keep singleFileObject locally:
-	// 	// --- TEMPORARY LOCAL STATE FOR FILE OBJECT ---
-	// 	const [singleFileObject, setSingleFileObject] = useState<File | null>(null);
-	// 	const handleSingleFileSelectRedux = useCallback((selectedFile: File | null) => {
-	// 		dispatch(setSingleFile(selectedFile)); // Update Redux with FileInfo
-	// 		setSingleFileObject(selectedFile); // Keep actual File locally
-	// 		// ... auto-populate name logic ...
-	// 	}, [dispatch]);
-
-	// const handleSingleSubmit = useCallback(async (e: React.FormEvent) => {
-	// 	e.preventDefault();
-	// 	// Use Redux state for check, but local state for file object
-	// 	if (!isSingleFormComplete || !singleFileObject) {
-	// 		toast({ title: 'Error', description: 'Please complete the form and select a file.', variant: 'destructive' });
-	// 		return;
-	// 	}
-	// 	const formData = new FormData();
-	// 	formData.append('certificate', singleFileObject);
-	// 	formData.append('recipientName', singleFormData.recipientName);
-	// 	formData.append('recipientEmail', singleFormData.recipientEmail);
-	// 	formData.append('certificateName', singleFormData.certificateName);
-
-	// 	const resultAction = await dispatch(submitSingleIssue({ formData }));
-
-	// 	if (submitSingleIssue.rejected.match(resultAction)) {
-	// 		toast({ title: 'Queueing Failed', description: resultAction.payload as string, variant: 'destructive' });
-	// 	} else if (submitSingleIssue.fulfilled.match(resultAction)) {
-	// 		toast({ title: 'Success', description: `Certificate queued (Task ID: ${resultAction.payload.taskId})` });
-	// 		setSingleFileObject(null); // Reset local file state
-	// 		dispatch(resetSingleIssueState());
-	// 	}
-	// }, [isSingleFormComplete, singleFileObject, singleFormData, dispatch, toast]); // Added dispatch, singleFileObject, singleFormData
-
-
-	// 	// --- END TEMPORARY LOCAL STATE ---
-
-	// 	if (!singleFileObject) {
-	// 		toast({ title: 'Error', description: 'File not available for submission.', variant: 'destructive' });
-	// 		return;
-	// 	}
-
-	// 	formData.append('certificate', singleFileObject); // Append the actual file
-	// 	formData.append('recipientName', singleFormData.recipientName);
-	// 	formData.append('recipientEmail', singleFormData.recipientEmail);
-	// 	formData.append('certificateName', singleFormData.certificateName);
-
-	// 	// Dispatch the async thunk
-	// 	const resultAction = await dispatch(submitSingleIssue({ formData }));
-
-	// 	// Handle potential rejection explicitly (optional, extraReducers handle state)
-	// 	if (submitSingleIssue.rejected.match(resultAction)) {
-	// 		toast({ title: 'Queueing Failed', description: resultAction.payload as string, variant: 'destructive' });
-	// 	} else if (submitSingleIssue.fulfilled.match(resultAction)) {
-	// 		toast({ title: 'Success', description: `Certificate queued (Task ID: ${resultAction.payload.taskId})` });
-	// 		// Reset local file state after successful queuing
-	// 		setSingleFileObject(null);
-	// 		// Reset Redux form state
-	// 		dispatch(resetSingleIssueState()); // Reset Redux state including file info
-	// 	}
-	// }, [dispatch, isSingleFormComplete, singleFileObject, singleFormData, toast]); // Add singleFileObject dependency
-
-
-	// // Bulk Issuance Handlers
-	// const handleBulkCsvSelect = useCallback((selectedFile: File | null) => {
-	// 	dispatch(setCsvFile(selectedFile)); // Dispatch action to update Redux state
-	// }, [dispatch]);
-
-	// const handleBulkDriveLinkChange = useCallback((value: string) => {
-	// 	dispatch(setGoogleDriveLink(value));
-	// }, [dispatch]);
-
-	// const handleBulkPreview = useCallback(async () => {
-	// 	if (!csvFile) return; // Check Redux state for file info
-
-	// 	// Need the actual File object for the API call
-	// 	// --- TEMPORARY LOCAL STATE FOR CSV FILE OBJECT ---
-	// 	const [bulkCsvFileObject, setBulkCsvFileObject] = useState<File | null>(null);
-	// 	const handleBulkCsvSelectRedux = useCallback((selectedFile: File | null) => {
-	// 		dispatch(setCsvFile(selectedFile)); // Update Redux with FileInfo
-	// 		setBulkCsvFileObject(selectedFile); // Keep actual File locally
-	// 	}, [dispatch]);
-	// 	// --- END TEMPORARY LOCAL STATE ---
-
-	// 	if (!bulkCsvFileObject) {
-	// 		toast({ title: 'Error', description: 'CSV File not available for preview.', variant: 'destructive' });
-	// 		return;
-	// 	}
-
-	// 	const formData = new FormData();
-	// 	formData.append('csvFile', bulkCsvFileObject);
-	// 	// Optionally send drive link during preview if backend needs it?
-	// 	// formData.append('folderLink', googleDriveLink);
-
-	// 	// Dispatch the async thunk
-	// 	const resultAction = await dispatch(previewCsvFile(formData));
-
-	// 	if (previewCsvFile.rejected.match(resultAction)) {
-	// 		toast({ title: 'Preview Error', description: resultAction.payload as string, variant: 'destructive' });
-	// 	} else if (previewCsvFile.fulfilled.match(resultAction)) {
-	// 		toast({ title: 'Preview Ready', description: `${resultAction.payload.data.length} records loaded.` });
-	// 	}
-	// }, [dispatch, csvFile, bulkCsvFileObject, toast]); // Add bulkCsvFileObject dependency
-
-	// const handleBulkStart = useCallback(async () => {
-	// 	if (previewData.length === 0 || hasPreviewRowErrors) {
-	// 		toast({ title: 'Error', description: 'Cannot start batch. Please preview a valid CSV first.', variant: 'destructive' });
-	// 		return;
-	// 	}
-	// 	// Dispatch the async thunk
-	// 	const resultAction = await dispatch(startIssuanceBatch({
-	// 		batchData: previewData, // Use previewData from Redux state
-	// 		folderLink: googleDriveLink, // Use drive link from Redux state
-	// 		fileName: csvFileName || undefined // Use file name from Redux state
-	// 	}));
-
-	// 	if (startIssuanceBatch.rejected.match(resultAction)) {
-	// 		toast({ title: 'Batch Start Error', description: resultAction.payload as string, variant: 'destructive' });
-	// 	} else if (startIssuanceBatch.fulfilled.match(resultAction)) {
-	// 		toast({ title: 'Batch Started', description: `${previewData.length} certificates queued.` });
-	// 		// No need to simulate WS updates here, the hook/real listener will handle it
-	// 	}
-	// }, [dispatch, previewData, googleDriveLink, csvFileName, hasPreviewRowErrors, toast]);
-
-	// const handleBulkReset = useCallback(() => {
-	// 	dispatch(resetBulkIssueState());
-	// 	// Also reset local file state if used
-	// 	setBulkCsvFileObject(null);
-	// }, [dispatch]);
-
-	// ==========================================================
 	// code that avoid TS errors:  -- START
 
 	// --- Handlers ---
@@ -405,41 +188,6 @@ const Issue: React.FC = () => {
 		dispatch(resetBulkIssueState());
 		setBulkCsvFileObject(null); // Reset local file state
 	}, [dispatch]); // Removed dispatch
-
-
-	// ==========================================================
-	// code that avoid TS errors:  -- START
-
-	// --- Mock WebSocket Hook Setup ---
-	// Pass previewData.length for simulation count
-	// We pass dispatch so the hook can dispatch 'updateTaskStatus'
-	// Note: This mock hook should be removed when real WebSockets are implemented
-	// useMockWebSocket(isBatchStarted, currentBatchId, previewData.length, dispatch);
-	// --- End Mock WebSocket Hook Setup ---
-
-
-	// // Update local file object when Redux file info changes (e.g., on reset)
-	// useEffect(() => { if (!singleFile) setSingleFileObject(null); }, [singleFile]);
-	// useEffect(() => { if (!csvFile) setBulkCsvFileObject(null); }, [csvFile]);
-
-	// // Modified file select handlers to update both Redux and local state
-	// const handleSingleFileSelectRedux = useCallback((selectedFile: File | null) => {
-	// 	dispatch(setSingleFile(selectedFile)); // Update Redux with FileInfo
-	// 	setSingleFileObject(selectedFile); // Keep actual File locally
-	// 	if (selectedFile) {
-	// 		if (selectedFile.name.includes('degree')) dispatch(setSingleFormData({ field: 'certificateName', value: 'Bachelor of Science' }));
-	// 		else if (selectedFile.name.includes('diploma')) dispatch(setSingleFormData({ field: 'certificateName', value: 'Diploma' }));
-	// 		else dispatch(setSingleFormData({ field: 'certificateName', value: 'Certificate' }));
-	// 	} else {
-	// 		dispatch(setSingleFormData({ field: 'certificateName', value: '' }));
-	// 	}
-	// }, [dispatch]);
-
-	// const handleBulkCsvSelectRedux = useCallback((selectedFile: File | null) => {
-	// 	dispatch(setCsvFile(selectedFile)); // Update Redux with FileInfo
-	// 	setBulkCsvFileObject(selectedFile); // Keep actual File locally
-	// }, [dispatch]);
-	// // --- END TEMPORARY LOCAL STATE ---
 
 
 	return (
