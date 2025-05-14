@@ -75,17 +75,22 @@ const Verify: React.FC = () => {
 	// --- Prepare data for CertificateCard (if result exists) ---
 	// This part needs adaptation based on what details you want to show
 	// and what the backend actually returns in result.details
-	const certificateToDisplay: Certificate | null = result ? {
-		id: result.hash || `temp-${Date.now()}`, // Use hash or temp ID
-		name: fileInfo?.name || 'Uploaded Certificate', // Use original filename
-		recipientName: result.details?.recipientName || 'N/A', // Example: Get from result.details if available
-		recipientEmail: result.details?.recipientEmail || 'N/A',
-		issuerId: result.details?.issuerId || 'N/A',
-		issuerName: result.details?.issuerName || 'N/A',
-		issueDate: result.details?.issueDate || 'N/A',
+	const certificateToDisplay: Certificate | null = result && result.details ? { // Check result.details
+		id: result.hash || `temp-${Date.now()}`,
+		name: result.details.certificateName || fileInfo?.name || 'Uploaded Certificate', // Prioritize from details
+		recipientName: result.details.recipientName || 'N/A',
+		recipientEmail: result.details.recipientEmail || 'N/A', // If backend sends it
+		issuerId: 'N/A', // We don't get issuerId in public details usually
+		issuerName: result.details.issuerName || 'N/A',
+		issueDate: result.details.issueDate ? new Date(result.details.issueDate).toLocaleDateString() : 'N/A',
 		hash: result.hash || 'N/A',
-		verified: result.isValid, // Set verified status from result
-	} : null;
+		verified: result.isValid,
+	} : (result ? { // Fallback if details are null but result exists
+		id: result.hash || `temp-${Date.now()}`,
+		name: fileInfo?.name || 'Uploaded Certificate',
+		recipientName: 'N/A', recipientEmail: 'N/A', issuerId: 'N/A', issuerName: 'N/A (Verified On-Chain)',
+		issueDate: 'N/A', hash: result.hash || 'N/A', verified: result.isValid
+	} : null);
 
 	return (
 		<DashboardLayout requiredRole="verifier">

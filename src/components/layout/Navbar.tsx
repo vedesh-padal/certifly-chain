@@ -40,6 +40,7 @@ export const Navbar: React.FC = () => {
 		dispatch(logout()); // Dispatch the logout action
 		// Navigation to /login will happen automatically if protected routes are used
 		// Or can explicitly navigate here if needed, though redirect is cleaner
+		navigate('/', { replace: true });
 	};
 
 	const navigationItems = [

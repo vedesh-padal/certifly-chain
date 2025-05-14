@@ -10,9 +10,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 interface VerificationResult {
 	isValid: boolean;
 	hash: string | null;
-	message?: string; // Optional message from backend
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	details?: any; // Optional details (structure unknown for now)
+	message?: string;
+	details: { // Expect these fields from the updated backend response
+		certificateName?: string;
+		recipientName?: string;
+		recipientEmail?: string; // If you decide to send it
+		issuerName?: string;
+		issueDate?: string; // Will be ISO string from backend
+		// Add any other fields you expect in 'details'
+	} | null;
 }
 
 // Define the state structure for this slice
